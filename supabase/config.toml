@@ -1,0 +1,2 @@
+[functions.vaani-api]
+verify_jwt = false
