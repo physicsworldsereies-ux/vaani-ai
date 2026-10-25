@@ -58,7 +58,7 @@ footer nav{all:unset;display:flex;gap:1.2rem;flex-wrap:wrap}footer a{color:var(-
 /* modal */
 .ov{position:fixed;inset:0;background:rgba(5,8,18,.65);display:flex;align-items:center;justify-content:center;padding:1rem;z-index:20;animation:fd .2s}
 @keyframes fd{from{opacity:0}}
-.mod{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:1.8rem;width:min(420px,100%);animation:pop .25s}
+.mod{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:1.8rem;width:min(420px,100%);animation:pop .25s}.mod:has(.admin-modal){width:min(1120px,100%);max-height:92dvh;overflow:auto}.admin-modal h2{font-size:1.45rem}.admin-modal h3{margin:1.4rem 0 .65rem}.admin-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.6rem;margin:1rem 0}.admin-stats .pack{padding:.8rem}.admin-stats h2{margin:.2rem 0}.admin-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem}.admin-form label{display:flex;flex-direction:column;gap:.35rem;color:var(--mut);font-size:.85rem}.admin-form input:not([type=checkbox]),.admin-form textarea{width:100%;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:.6rem}.admin-form .wide{grid-column:1/-1}.admin-table{overflow:auto;max-width:100%}.admin-table table{width:100%;border-collapse:collapse;font-size:.84rem}.admin-table th,.admin-table td{padding:.6rem;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}.admin-table th{color:var(--mut)}@media(max-width:700px){.admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-form{grid-template-columns:1fr}.admin-form .wide{grid-column:auto}.mod:has(.admin-modal){padding:1rem}}
 @keyframes pop{from{transform:translateY(14px) scale(.97);opacity:0}}
 .mod h2{font-size:1.5rem;margin-bottom:.4rem}.mod p{color:var(--mut);margin-bottom:1.2rem}
 .g{display:flex;gap:.7rem;align-items:center;justify-content:center;width:100%;background:#fff;color:#1f1f1f;border-radius:10px;padding:.75rem;font-weight:600}
@@ -146,6 +146,7 @@ textarea::placeholder{color:var(--mut)}
 .stars{position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--stars) center/cover no-repeat;opacity:.2}
 @media(prefers-color-scheme:light){:root:not([data-theme=dark]) .stars{display:none}}
 :root[data-theme=light] .stars{display:none}
+.fi{width:100%;padding:.8rem 1rem;border-radius:10px;border:1px solid var(--line);background:var(--bg2);color:var(--ink2);font:inherit;margin-bottom:.8rem}.fi:focus{outline:0;border-color:var(--acc2)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -168,12 +169,12 @@ textarea::placeholder{color:var(--mut)}
 <div class="s3"><b>Secure payments</b><br><span class="small">Top up with UPI, cards or net banking through Razorpay.</span></div></div></section>
 <section class="sec" id="price"><h2>Credit packs</h2><div class="packs" id="packs"></div>
 <p class="small" style="margin-top:1rem">One-time payments in INR. Credits never expire.</p></section>
-<footer><span>© 2026 Vaani</span><nav><a href="#">Privacy Policy</a><a href="#">Terms &amp; Conditions</a><a href="#">Refund Policy</a><a href="#">Contact Us</a></nav></footer>
+<footer><span>© 2026 Vaani</span><nav><a href="#privacy" onclick="event.preventDefault();legalOpen('privacy')">Privacy Policy</a><a href="#terms" onclick="event.preventDefault();legalOpen('terms')">Terms &amp; Conditions</a><a href="#refund" onclick="event.preventDefault();legalOpen('refund')">Refund Policy</a><a href="#support" onclick="event.preventDefault();legalOpen('support')">Contact Us</a></nav></footer>
 </div>
 
 <div id="app" class="hide">
 <aside id="side"><div class="logo"><span class="dot"></span>Vaani</div>
-<button class="btn ghost" onclick="newChat()">+ New chat</button>
+<button class="btn ghost" onclick="newChat()">+ New chat</button><button class="btn ghost hide" id="adminBtn" onclick="adminOpen()">⚙ Admin panel</button>
 <div class="hist" id="hist"></div>
 <div class="cred"><div><span class="small">Credits left</span><br><b id="cr">50</b></div><button class="btn pri" style="padding:.5rem .9rem" onclick="buyOpen()">Top up</button></div>
 <button class="me" onclick="profOpen()"><span class="av" id="av">D</span><span><b id="nm">Demo User</b><br><span class="small">Profile</span></span></button></aside>
@@ -181,48 +182,88 @@ textarea::placeholder{color:var(--mut)}
 <div id="msgs"><div class="col" id="col"></div></div>
 <div class="comp"><div class="box"><button class="ic" aria-label="Attach file" onclick="toast('File upload comes in the next phase')">＋</button>
 <textarea id="in" rows="1" placeholder="Message Vaani"></textarea><button class="ic send" id="sb" aria-label="Send">➤</button></div>
-<p class="small" style="text-align:center;margin-top:.5rem">Each reply uses credits based on its length.</p></div></main></div>
+<p class="small" style="text-align:center;margin-top:.5rem">AI responses are powered by Gemini. Credits are charged by usage.</p></div></main></div>
 
 <div id="mod"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script><script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
 const $=id=>document.getElementById(id);
-const PACKS=[{c:100,p:99},{c:500,p:399,b:1},{c:1500,p:999},{c:5000,p:2999}];
-$('packs').innerHTML=PACKS.map(k=>`<div class="pack${k.b?' best':''}">${k.b?'<span class="tag">Most popular</span>':''}<h3>${k.c} <small>credits</small></h3><div class="pr">₹${k.p}</div><button class="btn ${k.b?'pri':'ghost'}" style="width:100%" onclick="authOpen()">Choose</button></div>`).join('');
+let PACKS=[{id:1,c:100,p:99},{id:2,c:500,p:399,b:1},{id:3,c:1500,p:999},{id:4,c:5000,p:2999,b:0}];
+const API_URL=SB_URL+'/functions/v1/vaani-api';
+async function api(action, payload={}){const {data}=await sb.auth.getSession();const token=data.session?.access_token;if(!token)throw new Error('Please sign in again.');const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':SB_KEY},body:JSON.stringify({action,...payload})});const out=await res.json().catch(()=>({error:'Invalid server response'}));if(!res.ok)throw new Error(out.error||'Request failed');return out;}
+function renderPacks(){$('packs').innerHTML=PACKS.map(k=>`<div class="pack${k.b?' best':''}">${k.b?'<span class="tag">Most popular</span>':''}<h3>${k.c} <small>credits</small></h3><div class="pr">₹${Number(k.p).toFixed(2)}</div><button class="btn ${k.b?'pri':'ghost'}" style="width:100%" onclick="${'user'?'buyOpen()':'authOpen()'}">Choose</button></div>`).join('')}renderPacks();
 // theme
 $('th').onclick=()=>{const r=document.documentElement,d=getComputedStyle(r).colorScheme==='dark';r.dataset.theme=d?'light':'dark'};
 // hero demo loop
 const Q=[['Draft a polite follow-up email','Sure. Here is a short version: “Hi Priya, thanks for your time yesterday. I wanted to follow up on the proposal and see if you have any questions.”'],['Explain UPI in one line','UPI lets you send money instantly from your bank account using just a phone number or a QR code.']];
 let qi=0,dc=50;function loop(){const [q,a]=Q[qi++%Q.length],dq=$('dq'),da=$('da');dq.textContent=q;da.textContent='';let i=0;(function t(){if(!$('da').isConnected)return;da.textContent=a.slice(0,i++);if(i<=a.length)setTimeout(t,28);else{dc=dc>46?dc-1:50;$('dc').textContent=dc;$('dm').style.width=dc*2+'%';setTimeout(loop,2600)}})()}
 loop();
-// state
-let user=null,chats=[],cur=null,credits=50,busy=false;
+// ===== Supabase =====
+const SB_URL='https://voohqnqyspxdlyaqygof.supabase.co',SB_KEY='sb_publishable__GL22Bcvbk0VC-uhhrsQ1Q_9edvV9OD';
+const WORKER_URL=''; // Phase 4: Cloudflare Worker URL (Gemini) goes here
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+let user=null,prof=null,chats=[],cur=null,busy=false;
 function modal(h){$('mod').innerHTML=`<div class="ov" onclick="if(event.target===this)closeM()"><div class="mod" role="dialog" aria-modal="true">${h}</div></div>`}
 function closeM(){$('mod').innerHTML=''}
-function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),2400)}
-function authOpen(){modal(`<h2>Welcome to Vaani</h2><p>Sign in to get 50 free credits and save your chats.</p><button class="g" onclick="signIn()"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>Continue with Google</button><p class="small" style="margin:1rem 0 0">By continuing you agree to the Terms and Privacy Policy.</p>`)}
-function signIn(){user={n:'Demo User',e:'demo@example.com'};closeM();$('land').classList.add('hide');$('app').classList.remove('hide');$('cr').textContent=credits;newChat();toast('Signed in. This is a demo, no real login yet.')}
-function buyOpen(){modal(`<h2>Top up credits</h2><p>Pay once with Razorpay. Credits never expire.</p>`+PACKS.map(k=>`<div class="row"><span><b>${k.c}</b> credits</span><button class="btn ${k.b?'pri':'ghost'}" style="padding:.4rem .9rem" onclick="buy(${k.c},${k.p})">₹${k.p}</button></div>`).join('')+`<button class="btn ghost" style="width:100%;margin-top:1rem" onclick="closeM()">Close</button>`)}
-function buy(c,p){closeM();credits+=c;$('cr').textContent=credits;toast(c+' credits added (demo, no real payment)')}
-function profOpen(){modal(`<h2>Your profile</h2><div class="row"><span>Name</span><b>${user.n}</b></div><div class="row"><span>Email</span><b>${user.e}</b></div><div class="row"><span>Credits</span><b>${credits}</b></div><div class="row"><span>Chats</span><b>${chats.length}</b></div><div style="display:flex;gap:.6rem;margin-top:1.2rem"><button class="btn ghost" style="flex:1" onclick="closeM()">Close</button><button class="btn ghost" style="flex:1" onclick="out()">Sign out</button></div>`)}
-function out(){closeM();user=null;chats=[];$('app').classList.add('hide');$('land').classList.remove('hide')}
-function newChat(){cur={id:Date.now(),t:'New chat',m:[]};chats.unshift(cur);draw();$('side').classList.remove('open')}
-function open_(id){cur=chats.find(c=>c.id===id);draw();$('side').classList.remove('open')}
+function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),2800)}
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+async function loadPacks(){try{const {data,error}=await sb.from('credit_packs').select('id,name,credits,price_paise,is_popular').eq('active',true).order('sort');if(!error&&data&&data.length){PACKS=data.map(d=>({id:d.id,name:d.name,c:d.credits,p:d.price_paise/100,b:d.is_popular}));renderPacks()}}catch(e){}}
+loadPacks();
+function authOpen(){modal(`<h2>Welcome to Vaani</h2><p>Sign in to get free credits and save your chats.</p><button class="g" onclick="signIn()"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>Continue with Google</button><p class="small" style="margin:1rem 0 0">By continuing you agree to the Terms and Privacy Policy.</p>`)}
+async function signIn(){const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.href.split('#')[0]}});if(error)toast('Login failed: '+error.message)}
+async function enter(session){
+user=session.user;
+const {data}=await sb.from('profiles').select('*').eq('id',user.id).single();
+prof=data||{credits:0,full_name:null,email:user.email,avatar_url:null};
+if(prof.is_banned){await sb.auth.signOut();toast('This account is blocked. Contact support.');return}
+const nm=prof.full_name||(user.email||'You').split('@')[0];
+$('nm').textContent=nm;const av=$('av');av.textContent=nm[0].toUpperCase();
+if(prof.avatar_url){av.textContent='';av.style.backgroundImage='url('+JSON.stringify(prof.avatar_url)+')';av.style.backgroundSize='cover'}
+$('cr').textContent=prof.credits; $('adminBtn').classList.toggle('hide',!prof.is_admin);
+closeM();$('land').classList.add('hide');$('app').classList.remove('hide');
+const r=await sb.from('chats').select('id,title').order('updated_at',{ascending:false});
+chats=(r.data||[]).map(c=>({id:c.id,t:c.title,m:null}));
+newChat()}
+sb.auth.onAuthStateChange((ev,session)=>{
+if(session&&!user){setTimeout(()=>enter(session),0)}
+else if(!session&&user){user=null;prof=null;chats=[];cur=null;$('app').classList.add('hide');$('land').classList.remove('hide')}});
+async function out(){closeM();await sb.auth.signOut()}
+function buyOpen(){if(!user){authOpen();return}modal(`<h2>Top up credits</h2><p>Secure checkout via Razorpay. Credits are added only after server-side signature verification.</p>`+PACKS.map(k=>`<div class="row"><span><b>${k.c}</b> credits</span><button class="btn ${k.b?'pri':'ghost'}" style="padding:.4rem .9rem" onclick="buy(${Number(k.id)})">₹${Number(k.p).toFixed(2)}</button></div>`).join('')+`<button class="btn ghost" style="width:100%;margin-top:1rem" onclick="closeM()">Close</button>`)}
+async function buy(packId){try{if(!window.Razorpay)throw new Error('Razorpay Checkout failed to load.');const order=await api('create-order',{pack_id:packId});closeM();const checkout=new Razorpay({key:order.key_id,amount:order.amount,currency:order.currency,name:order.name,description:order.description,order_id:order.order_id,prefill:order.prefill,theme:{color:'#ffb547'},handler:async function(response){try{const result=await api('verify-payment',response);const {data}=await sb.from('profiles').select('*').eq('id',user.id).single();if(data)prof=data;$('cr').textContent=prof.credits;toast('Payment verified. Credits updated.');}catch(e){toast('Payment submitted but verification needs attention: '+e.message)}} ,modal:{ondismiss:function(){toast('Checkout closed. If payment succeeded, credits update after verification.')}}});checkout.open()}catch(e){toast(e.message||'Could not start payment')}}
+function profOpen(){modal(`<h2>Your profile</h2><div class="row"><span>Name</span><b>${esc(prof.full_name||'-')}</b></div><div class="row"><span>Email</span><b>${esc(user.email||'-')}</b></div><div class="row"><span>Credits</span><b>${prof.credits}</b></div><div class="row"><span>Chats</span><b>${chats.length}</b></div><div style="display:flex;gap:.6rem;margin-top:1.2rem"><button class="btn ghost" style="flex:1" onclick="closeM()">Close</button><button class="btn ghost" style="flex:1" onclick="out()">Sign out</button></div>`)}
+function newChat(){cur={id:null,t:'New chat',m:[]};draw();$('side').classList.remove('open')}
+async function open_(id){cur=chats.find(c=>c.id===id);
+if(cur.m===null){const r=await sb.from('messages').select('role,content').eq('chat_id',id).order('created_at');cur.m=(r.data||[]).map(x=>({r:x.role==='user'?'u':'b',x:x.content}))}
+draw();$('side').classList.remove('open')}
 function draw(){
-$('hist').innerHTML='<small>History</small>'+chats.filter(c=>c.m.length).map(c=>`<button class="${c.id===cur.id?'on':''}" onclick="open_(${c.id})">${esc(c.t)}</button>`).join('');
+$('hist').innerHTML='<small>History</small>'+chats.map(c=>`<button class="${cur&&c.id===cur.id?'on':''}" onclick="open_('${c.id}')">${esc(c.t)}</button>`).join('');
 $('ct').textContent=cur.t;
-$('col').innerHTML=cur.m.length?cur.m.map(msg=>row(msg)).join(''):`<div class="empty"><h2>What can I help with?</h2><div class="sug">${['Summarise a long article','Plan a 3-day trip','Fix my resume','Explain a tough topic'].map(s=>`<button onclick="ask('${s}')">${s}</button>`).join('')}</div></div>`;
+$('col').innerHTML=cur.m.length?cur.m.map(row).join(''):`<div class="empty"><h2>What can I help with?</h2><div class="sug">${['Summarise a long article','Plan a 3-day trip','Fix my resume','Explain a tough topic'].map(s=>`<button onclick="ask('${s}')">${s}</button>`).join('')}</div></div>`;
 $('msgs').scrollTop=1e9}
-const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-const row=m=>`<div class="m ${m.r==='b'?'bot':''}"><span class="av">${m.r==='b'?'V':'D'}</span><div class="t">${esc(m.x)}</div></div>`;
+const row=m=>`<div class="m ${m.r==='b'?'bot':''}"><span class="av">${m.r==='b'?'V':'U'}</span><div class="t">${esc(m.x)}</div></div>`;
 function ask(t){$('in').value=t;send()}
 async function send(){
-const v=$('in').value.trim();if(!v||busy)return;
-if(credits<1){buyOpen();return}
-busy=true;$('in').value='';if(!cur.m.length)cur.t=v.slice(0,36);
-cur.m.push({r:'u',x:v});const b={r:'b',x:''};cur.m.push(b);draw();$('col').lastElementChild.querySelector('.t').innerHTML='<span class="dots"><i></i><i></i><i></i></span>';await new Promise(r=>setTimeout(r,700));
-const full='This is a demo reply. In the real version, Gemini will answer here, guided by the system prompt you set in the admin panel. It is written out letter by letter, like ink on paper. नमस्ते! Hindi bhi isi tarah likhi jaayegi.';
-const te=$('col').lastElementChild.querySelector('.t');te.classList.add('writing');for(const ch of full){b.x+=ch;te.textContent=b.x;$('msgs').scrollTop=1e9;await new Promise(r=>setTimeout(r,ch===' '?40:26))}
-credits-=1;$('cr').textContent=credits;draw();busy=false}
+const v=$('in').value.trim();if(!v||busy)return;if(!user){authOpen();return}if(prof.credits<1){buyOpen();return}
+busy=true;$('in').value='';const prior=cur.id;cur.m.push({r:'u',x:v});const b={r:'b',x:'Thinking…'};cur.m.push(b);draw();
+try{const result=await api('chat',{chat_id:prior||null,message:v});cur.id=result.chat_id;cur.t=cur.t==='New chat'?v.slice(0,36):cur.t;if(!prior){chats.unshift(cur)}b.x=result.answer;prof.credits=result.credits_remaining;$('cr').textContent=prof.credits;draw();
+}catch(e){cur.m.pop();cur.m.pop();draw();toast(e.message||'AI request failed')}
+finally{busy=false}
+}
+
+async function adminOpen(){
+ try{const d=await api('admin-data');const settings=Object.fromEntries((d.settings||[]).map(x=>[x.key,x.value]));
+ const users=(d.users||[]).map(u=>`<tr><td>${esc(u.email||u.id)}</td><td>${Number(u.credits)}</td><td>${u.is_admin?'Admin':'User'}</td><td>${u.is_banned?'Banned':'Active'}</td><td><button class="btn ghost" onclick="adminUser('${u.id}','is_banned',${!u.is_banned})">${u.is_banned?'Unban':'Ban'}</button> <button class="btn ghost" onclick="adminCredit('${u.id}')">+ Credits</button> <button class="btn ghost" onclick="adminUser('${u.id}','is_admin',${!u.is_admin})">${u.is_admin?'Remove admin':'Make admin'}</button></td></tr>`).join('');
+ const packs=(d.packs||[]).map(k=>`<div class="row"><span><b>${esc(k.name)}</b><br><small>${k.credits} credits · ₹${(k.price_paise/100).toFixed(2)}</small></span><button class="btn ghost" onclick="adminEditPack(${k.id},${k.credits},${k.price_paise},${k.active})">Edit</button></div>`).join('');
+ const orders=(d.orders||[]).slice(0,40).map(o=>`<tr><td>${esc(o.razorpay_order_id)}</td><td>₹${(o.amount_paise/100).toFixed(2)}</td><td>${o.credits}</td><td>${esc(o.status)}</td><td>${esc(String(o.created_at||'').slice(0,10))}</td></tr>`).join('');
+ modal(`<div class="admin-modal"><div style="display:flex;justify-content:space-between;gap:1rem;align-items:center"><h2>Vaani Admin</h2><button class="btn ghost" onclick="closeM()">Close</button></div><p>Server-protected controls. Changes take effect immediately.</p><div class="admin-stats"><div class="pack"><small>Users</small><h2>${d.stats?.users??0}</h2></div><div class="pack"><small>Banned</small><h2>${d.stats?.banned??0}</h2></div><div class="pack"><small>Revenue</small><h2>₹${Number(d.stats?.revenue_inr??0).toFixed(2)}</h2></div><div class="pack"><small>Messages</small><h2>${d.stats?.messages??0}</h2></div></div><h3>AI & billing settings</h3><div class="admin-form"><label>Gemini model<input id="adm-model" value="${esc(String(settings.model??'gemini-2.5-flash'))}"></label><label>Credits per 1k input tokens<input id="adm-inrate" type="number" min="0" value="${Number(settings.credits_per_1k_input??1)}"></label><label>Credits per 1k output tokens<input id="adm-outrate" type="number" min="0" value="${Number(settings.credits_per_1k_output??4)}"></label><label>Signup bonus credits<input id="adm-free" type="number" min="0" value="${Number(settings.free_credits??50)}"></label><label class="wide">System prompt<textarea id="adm-prompt" rows="3">${esc(String(settings.system_prompt??''))}</textarea></label><label><input id="adm-maint" type="checkbox" ${settings.maintenance_mode===true?'checked':''}> Maintenance mode</label><button class="btn pri" onclick="adminSaveSettings()">Save settings</button></div><h3>Credit packs</h3>${packs}<h3>Users (latest 200)</h3><div class="admin-table"><table><thead><tr><th>Email</th><th>Credits</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>${users||'<tr><td colspan="5">No users yet</td></tr>'}</tbody></table></div><h3>Orders (latest 200)</h3><div class="admin-table"><table><thead><tr><th>Razorpay order</th><th>Amount</th><th>Credits</th><th>Status</th><th>Date</th></tr></thead><tbody>${orders||'<tr><td colspan="5">No orders yet</td></tr>'}</tbody></table></div><h3>Recent credit ledger</h3><div class="admin-table"><table><thead><tr><th>User ID</th><th>Delta</th><th>Reason</th><th>Reference</th></tr></thead><tbody>${(d.ledger||[]).slice(0,50).map(l=>`<tr><td>${esc(l.user_id)}</td><td>${Number(l.delta)}</td><td>${esc(l.reason)}</td><td>${esc(l.ref||'')}</td></tr>`).join('')}</tbody></table></div></div>`);
+ }catch(e){toast(e.message||'Could not load admin panel')}
+}
+async function adminUser(userId,key,value){try{await api('admin-user',{user_id:userId,[key]:value});toast('User updated');adminOpen()}catch(e){toast(e.message)}}
+async function adminCredit(userId){const amount=Number(prompt('How many credits should be added?'));if(!Number.isInteger(amount)||amount<1)return;try{await api('admin-credit',{user_id:userId,amount});toast('Credits added');adminOpen()}catch(e){toast(e.message)}}
+async function adminEditPack(id,credits,pricePaise,active){const c=Number(prompt('Credits in pack',String(credits)));if(!Number.isInteger(c)||c<1)return;const p=Number(prompt('Price in rupees',String(pricePaise/100)));if(!Number.isFinite(p)||p<=0)return;const enabled=confirm('OK = active, Cancel = inactive');try{await api('admin-pack',{id,credits:c,price_paise:Math.round(p*100),active:enabled});toast('Pack updated');await loadPacks();adminOpen()}catch(e){toast(e.message)}}
+async function adminSaveSettings(){const values=[['model',$('adm-model').value],['credits_per_1k_input',Number($('adm-inrate').value)],['credits_per_1k_output',Number($('adm-outrate').value)],['free_credits',Number($('adm-free').value)],['system_prompt',$('adm-prompt').value],['maintenance_mode',$('adm-maint').checked]];try{for(const [key,value] of values)await api('admin-setting',{key,value});toast('Settings saved');adminOpen()}catch(e){toast(e.message)}}
+function legalOpen(kind){const docs={privacy:['Privacy Policy','Vaani stores account profile information, chat messages, credit usage and payment references to provide the service. Gemini requests are processed by Google. Razorpay handles payment details; Vaani does not store card or UPI credentials. Do not submit sensitive personal information in chats. Publish a contact address and data-retention/deletion process before public launch.'],terms:['Terms & Conditions','Vaani provides AI-generated responses that may be inaccurate; verify important information independently. Credits are usage units and are not cash. Access may be suspended for abuse, fraud or security reasons. Do not use the service unlawfully. Publish the operator name, jurisdiction, and final commercial terms before accepting live payments.'],refund:['Refund Policy','Payments are processed by Razorpay. Do not promise automatic refunds until your refund process is configured. For duplicate or failed transactions, retain the Razorpay payment ID and contact the site operator. Add a verified support contact and final refund timeline before enabling live payments.'],support:['Contact Us','Support contact details must be configured by the site owner before launch. If a payment is pending, keep the Razorpay order ID and payment ID for support.']};const [title,body]=docs[k]||docs.support;modal(`<h2>${title}</h2><p>${body}</p><button class="btn pri" style="width:100%" onclick="closeM()">Close</button>`)}
+
 $('sb').onclick=send;
 $('in').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
 $('in').addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=e.target.scrollHeight+'px'});
