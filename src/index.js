@@ -375,6 +375,19 @@ export default {
     headers.delete("content-length");headers.delete("content-encoding");headers.delete("etag");
     return new Response(html.replace("</body>",bootstrap+"</body>"),{status:assetResponse.status,headers});
   }
-  return env.ASSETS.fetch(req);
+  const assetResponse=await env.ASSETS.fetch(req);
+  // The app shell contains the authenticated sidebar/profile and responsive layout.
+  // Never let a browser reuse a stale shell after a Worker deployment.
+  const contentType=assetResponse.headers.get("content-type")||"";
+  if(contentType.includes("text/html")){
+    const headers=new Headers(assetResponse.headers);
+    headers.set("cache-control","no-store, no-cache, must-revalidate, max-age=0");
+    headers.set("pragma","no-cache");
+    headers.set("expires","0");
+    headers.delete("content-length");
+    headers.delete("content-encoding");
+    return new Response(assetResponse.body,{status:assetResponse.status,statusText:assetResponse.statusText,headers});
+  }
+  return assetResponse;
  }
 };
