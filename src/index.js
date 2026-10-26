@@ -252,9 +252,9 @@ async function adminAction(env,user,body){
   }
   throw Object.assign(new Error("unknown_admin_action"),{status:400});
 }
-async function apiAction(req,env,user,body){
+async function apiAction(req,env,user,body,token){
   const action=String(body.action||"");
-  if(action.startsWith("admin-"))return adminAction(env,user,body);
+  if(action.startsWith("admin-"))return adminAction(env,user,body,token);
   if(action==="create-order")return makeOrder(env,user,body.pack_id);
   if(action==="verify-payment")return verifyPayment(env,user,body);
   if(action==="chat")throw Object.assign(new Error("use_chat_endpoint"),{status:400});
@@ -300,7 +300,7 @@ export default {
     }
     if(path==="/api/order"){const b=JSON.parse(await readBody(req));return json(await makeOrder(env,user,b.pack_id),200,cors)}
     if(path==="/api/verify"){const b=JSON.parse(await readBody(req));return json(await verifyPayment(env,user,b),200,cors)}
-    const b=JSON.parse(await readBody(req));return json(await apiAction(req,env,user,b),200,cors);
+    const b=JSON.parse(await readBody(req));return json(await apiAction(req,env,user,b,(req.headers.get("authorization")||"").split(" ").slice(1).join(" ")),200,cors);
    }catch(e){return json({error:e.status===401?"unauthorized":e.message||"server_error"},e.status||500,cors)}
   }
   if(path.startsWith("/api/"))return json({error:"not_found"},404,cors);
