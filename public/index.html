@@ -364,7 +364,7 @@ try{
   }
  }
  if(!b.x)throw new Error('AI returned an empty answer');draw();
-}catch(e){cur.m.pop();cur.m.pop();draw();const M={no_credits:'Your credits are finished. Please top up.',banned:'This account is blocked.',maintenance:'We are under maintenance. Please try again shortly.',unauthorized:'Please sign in again.',rate_limited:'Too many requests. Please wait a moment.'};toast(M[e.message]||e.message||'AI request failed')}
+}catch(e){cur.m.pop();cur.m.pop();draw();const M={no_credits:'Your credits are finished. Please top up.',banned:'This account is blocked.',maintenance:'We are under maintenance. Please try again shortly.',unauthorized:'Please sign in again.',rate_limited:'Too many requests. Please wait a moment.',ai_not_configured:'AI provider is not configured on the server.',ai_auth_error:'AI provider rejected the server API key. Check the Gemini key and API access.',ai_model_unavailable:'The selected Gemini model is unavailable. Choose a supported model in Admin settings.',ai_rate_limited:'Gemini is rate-limiting requests. Wait briefly and retry.',database_error:'The AI replied, but saving chat/credits failed. Please retry shortly.',empty_reply:'The AI returned an empty response. Please retry.',chat_not_found:'This chat could not be found. Start a new chat.',ai_error:'The AI service failed. Please retry shortly.'};toast(M[e.message]||e.message||'AI request failed')}
 finally{busy=false}
 }
 
