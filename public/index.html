@@ -443,6 +443,11 @@ let entering=false;
 async function enter(session){
  syncResponsiveLayout();
  if(!session?.user||entering)return;
+ // Reset transient chat/sidebar state on every fresh authenticated session.
+ // A prior full-chat toggle must not hide the sidebar after sign-out/sign-in.
+ $('app').classList.remove('full-chat');
+ $('side').classList.remove('open');
+ syncResponsiveLayout();
  entering=true;
  try{
   user=session.user;
