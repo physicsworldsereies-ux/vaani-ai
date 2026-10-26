@@ -344,7 +344,21 @@ async function enter(session){
   const r=await sb.from('chats').select('id,title').order('updated_at',{ascending:false});
   chats=(r.data||[]).map(c=>({id:c.id,t:c.title,m:null}));
   newChat();
- }catch(e){toast('Could not load your account: '+(e.message||'Please refresh and try again'));user=null;prof=null;$('app').classList.add('hide');$('land').classList.remove('hide')}
+ }catch(e){
+  toast('Account data could not fully load. You can still open your chat; refresh in a moment if needed.');
+  /* An authenticated user must never be sent back to the marketing homepage because a profile/history request failed. */
+  if(session?.user){
+    user=session.user;
+    prof=prof||{credits:0,full_name:null,email:user.email,avatar_url:null,is_admin:false};
+    const safeName=prof.full_name||(user.email||'You').split('@')[0];
+    $('nm').textContent=safeName;$('av').textContent=(safeName[0]||'U').toUpperCase();
+    $('cr').textContent=prof.credits??0;$('adminBtn').classList.toggle('hide',!prof.is_admin);
+    closeM();$('land').classList.add('hide');$('app').classList.remove('hide');
+    if(!cur)newChat();
+  }else{
+    user=null;prof=null;$('app').classList.add('hide');$('land').classList.remove('hide');
+  }
+}
  finally{entering=false}
 }
 sb.auth.onAuthStateChange((ev,session)=>{
