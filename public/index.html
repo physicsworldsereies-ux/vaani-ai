@@ -85,7 +85,7 @@ main{display:flex;flex-direction:column;min-height:0;position:relative}
 .empty{text-align:center;padding-top:12vh}.empty h2{font-size:2rem;margin-bottom:1.2rem}
 .sug{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center}
 .sug button{border:1px solid var(--line);padding:.6rem 1rem;border-radius:999px;color:var(--mut)}.sug button:hover{color:var(--tx);border-color:var(--acc)}
-.comp{padding:.8rem 1rem 1rem}
+.attach-tools{display:flex;gap:.25rem;align-items:center}.attach-tools .ic{font-size:1rem}.image-preview{display:flex;gap:.5rem;flex-wrap:wrap;padding:.5rem 0}.image-preview:empty{display:none}.image-chip{position:relative;width:72px;height:72px}.image-chip img{width:100%;height:100%;object-fit:cover;border-radius:10px;border:1px solid var(--line)}.image-chip button{position:absolute;right:-5px;top:-5px;border:0;border-radius:50%;width:23px;height:23px;background:#333;color:white;cursor:pointer}.m .t .sent-images{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.5rem}.sent-images img{max-width:min(220px,100%);max-height:220px;object-fit:contain;border-radius:10px;border:1px solid var(--line)}.comp{padding:.8rem 1rem 1rem}
 .box{max-width:760px;margin:auto;display:flex;gap:.5rem;align-items:flex-end;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:.5rem}
 .box:focus-within{border-color:var(--acc2)}
 textarea{flex:1;background:none;border:0;color:var(--tx);font:inherit;resize:none;padding:.5rem;max-height:160px;outline:0}
@@ -232,8 +232,8 @@ textarea::placeholder{color:var(--mut)}
 <button class="me" onclick="profOpen()"><span class="av" id="av">D</span><span><b id="nm">Demo User</b><br><span class="small">Profile</span></span></button></aside>
 <main><div class="top"><button class="ic menu" onclick="document.getElementById('side').classList.toggle('open')" aria-label="Menu">☰</button><b id="ct">New chat</b></div>
 <div id="msgs"><div class="col" id="col"></div></div>
-<div class="comp"><div class="box"><button class="ic" aria-label="Attach file" onclick="toast('File upload comes in the next phase')">＋</button>
-<textarea id="in" rows="1" placeholder="Message Vaani"></textarea><button class="ic send" id="sb" aria-label="Send">➤</button></div>
+<div class="comp"><div id="imagePreview" class="image-preview"></div><div class="box"><div class="attach-tools"><button class="ic" aria-label="Choose image from gallery" title="Gallery" onclick="$('galleryInput').click()">▧</button><button class="ic" aria-label="Take a photo" title="Camera" onclick="$('cameraInput').click()">📷</button></div><input id="galleryInput" type="file" accept="image/*" multiple hidden onchange="pickImages(this)"><input id="cameraInput" type="file" accept="image/*" capture="environment" hidden onchange="pickImages(this)">
+<textarea id="in" rows="1" placeholder="Message Vaani or add an image"></textarea><button class="ic send" id="sb" aria-label="Send">➤</button></div>
 <p class="small" style="text-align:center;margin-top:.5rem">AI responses are powered by Gemini. Credits are charged by usage.</p></div></main></div>
 
 <div id="mod"></div>
@@ -253,11 +253,16 @@ loop();
 // ===== Supabase =====
 const SB_URL='https://voohqnqyspxdlyaqygof.supabase.co',SB_KEY='sb_publishable__GL22Bcvbk0VC-uhhrsQ1Q_9edvV9OD';
 const sb=window.supabase.createClient(SB_URL,SB_KEY);
-let user=null,prof=null,chats=[],cur=null,busy=false;
+let user=null,prof=null,chats=[],cur=null,busy=false,pendingImages=[];
 function modal(h){$('mod').innerHTML=`<div class="ov" onclick="if(event.target===this)closeM()"><div class="mod" role="dialog" aria-modal="true">${h}</div></div>`}
 function closeM(){$('mod').innerHTML=''}
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),2800)}
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function imageMarkup(images){return (images||[]).map(x=>'<img alt="Attached image" src="data:'+esc(x.mime_type)+';base64,'+x.data+'">').join('')}
+function showImagePreview(){$('imagePreview').innerHTML=pendingImages.map((x,i)=>'<div class="image-chip"><img alt="Image preview" src="data:'+x.mime_type+';base64,'+x.data+'"><button type="button" aria-label="Remove image" onclick="removeImage('+i+')">×</button></div>').join('')}
+function removeImage(i){pendingImages.splice(i,1);showImagePreview()}
+async function pickImages(input){const files=Array.from(input.files||[]);input.value='';if(!files.length)return;for(const file of files){if(pendingImages.length>=3){toast('You can attach up to 3 images.');break}if(!file.type.startsWith('image/')){toast('Choose an image file.');continue}try{const data=await compressImage(file);pendingImages.push(data);showImagePreview()}catch(e){toast('Could not read that image.')}}}
+function compressImage(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const scale=Math.min(1,1280/Math.max(img.width,img.height));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0,canvas.width,canvas.height);const url=canvas.toDataURL('image/jpeg',.78);resolve({mime_type:'image/jpeg',data:url.split(',')[1]})};img.src=reader.result};reader.readAsDataURL(file)})}
 function formatReply(value){
  return String(value).split(/\r?\n/).map(line=>{
   let x=esc(line.trim());
@@ -302,20 +307,20 @@ $('hist').innerHTML='<small>History</small>'+chats.map(c=>`<button class="${cur&
 $('ct').textContent=cur.t;
 $('col').innerHTML=cur.m.length?cur.m.map(row).join(''):`<div class="empty"><h2>What can I help with?</h2><div class="sug">${['Summarise a long article','Plan a 3-day trip','Fix my resume','Explain a tough topic'].map(s=>`<button onclick="ask('${s}')">${s}</button>`).join('')}</div></div>`;
 $('msgs').scrollTop=1e9}
-const row=m=>`<div class="m ${m.r==='b'?'bot':''}"><span class="av">${m.r==='b'?'V':'U'}</span><div class="t">${m.r==='b'?formatReply(m.x):esc(m.x)}</div></div>`;
+const row=m=>`<div class="m ${m.r==='b'?'bot':''}"><span class="av">${m.r==='b'?'V':'U'}</span><div class="t">${m.r==='b'?formatReply(m.x):(m.imgs&&m.imgs.length?'<div class="sent-images">'+imageMarkup(m.imgs)+'</div>':'')+esc(m.x)}</div></div>`;
 function ask(t){$('in').value=t;send()}
 async function send(){
-const v=$('in').value.trim();if(!v||busy)return;if(!user){authOpen();return}if(prof.credits<1){buyOpen();return}
-busy=true;$('in').value='';const prior=cur.id;cur.m.push({r:'u',x:v});const b={r:'b',x:''};cur.m.push(b);draw();
+const v=$('in').value.trim(),imgs=pendingImages.slice();if((!v&&!imgs.length)||busy)return;if(!user){authOpen();return}if(prof.credits<1){buyOpen();return}
+const prompt=v||'Please describe and help me with the attached image.';pendingImages=[];showImagePreview();busy=true;$('in').value='';const prior=cur.id;cur.m.push({r:'u',x:v,imgs});const b={r:'b',x:''};cur.m.push(b);draw();
 const te=$('col').lastElementChild.querySelector('.t');te.innerHTML='<span class="dots"><i></i><i></i><i></i></span>';
 try{
  const {data:{session}}=await sb.auth.getSession();if(!session?.access_token)throw new Error('unauthorized');
- const res=await fetch(WORKER_URL+'/api/chat',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({chat_id:prior||null,message:v})});
+ const res=await fetch(WORKER_URL+'/api/chat',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({chat_id:prior||null,message:prompt,images:imgs})});
  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'AI request failed')}
  const rd=res.body.getReader(),dec=new TextDecoder();let buf='';
  for(;;){const {done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
   while((i=buf.indexOf('\n\n'))>=0){const ev=buf.slice(0,i);buf=buf.slice(i+2);if(!ev.startsWith('data:'))continue;let j;try{j=JSON.parse(ev.slice(5).trim())}catch{continue}
-   if(j.type==='meta'){if(!cur.id){cur.id=j.chat_id;cur.t=v.slice(0,36);chats.unshift(cur)}}
+   if(j.type==='meta'){if(!cur.id){cur.id=j.chat_id;cur.t=prompt.slice(0,36);chats.unshift(cur)}}
    else if(j.type==='delta'){b.x+=j.text;te.textContent=b.x;$('msgs').scrollTop=1e9}
    else if(j.type==='done'){if(Number.isFinite(j.credits_left)){prof.credits=j.credits_left;$('cr').textContent=prof.credits}}
    else if(j.type==='error')throw new Error(j.error||'AI request failed');
