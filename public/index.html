@@ -700,11 +700,16 @@ async function showChatForSession(session){
 }
 sb.auth.onAuthStateChange((ev,session)=>{
   if(session&&!user){void showChatForSession(session)}
-  else if(!session&&user){
-    document.documentElement.classList.remove('direct-chat');
-    user=null;prof=null;chats=[];cur=null;
-    $('app').classList.add('hide');$('land').classList.remove('hide');
+  else if(!session){
+    document.documentElement.classList.remove('direct-chat','auth-pending');
+    user=null;prof=null;chats=[];cur=null;entering=false;chatHandoff=null;
+    $('side').classList.remove('open','profile-open');
+    $('profilePanel').innerHTML='';
+    $('app').classList.add('hide');
+    $('land').classList.remove('hide');
     $('auth-loader').classList.add('hide');
+    closeM();
+    window.scrollTo(0,0);
   }
 });
 /* Resolve the saved session before revealing either homepage or chat. */
