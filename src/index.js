@@ -203,7 +203,7 @@ async function chat(req,env,ctx,cors,user,token){
   })());
   return new Response(readable,{headers:{...cors,"content-type":"text/event-stream; charset=utf-8","cache-control":"no-cache, no-transform","x-content-type-options":"nosniff"}});
 }
-async function adminAction(env,user,body){
+async function adminAction(env,user,body,token){
   await requireAdmin(env,user);
   const action=String(body.action||"");
   if(action==="admin-data"){
@@ -217,7 +217,11 @@ async function adminAction(env,user,body){
       sbJson(env,"/rest/v1/messages?select=created_at,credits_used&order=created_at.desc&limit=1000")
     ]);
     
-    const allOrders=orders.data||[],allLedger=ledger.data||[],allMessages=messages.data||[];\n    const daily={};\n    for(let i=29;i>=0;i--){const day=new Date(Date.now()-i*86400000).toISOString().slice(0,10);daily[day]={date:day,messages:0,credits_used:0,revenue_inr:0};}\n    for(const m of allMessages){const day=String(m.created_at||"").slice(0,10);if(daily[day]){daily[day].messages++;daily[day].credits_used+=Number(m.credits_used||0);}}\n    for(const o of allOrders){const day=String(o.created_at||"").slice(0,10);if(daily[day]&&o.status==="paid")daily[day].revenue_inr+=Number(o.amount_paise||0)/100;}
+    const allOrders=orders.data||[],allLedger=ledger.data||[],allMessages=messages.data||[];
+    const daily={};
+    for(let i=29;i>=0;i--){const day=new Date(Date.now()-i*86400000).toISOString().slice(0,10);daily[day]={date:day,messages:0,credits_used:0,revenue_inr:0};}
+    for(const m of allMessages){const day=String(m.created_at||"").slice(0,10);if(daily[day]){daily[day].messages++;daily[day].credits_used+=Number(m.credits_used||0);}}
+    for(const o of allOrders){const day=String(o.created_at||"").slice(0,10);if(daily[day]&&o.status==="paid")daily[day].revenue_inr+=Number(o.amount_paise||0)/100;}
     return {stats:stats.data||{},users:users.data||[],orders:allOrders,packs:packs.data||[],settings:settingsRows.data||[],ledger:allLedger,daily_usage:Object.values(daily)};
   }
   if(action==="admin-user"){
