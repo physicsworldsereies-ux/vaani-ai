@@ -32,7 +32,7 @@ export async function hmac(secret,value){
   return [...new Uint8Array(await crypto.subtle.sign("HMAC",key,enc.encode(value)))].map(x=>x.toString(16).padStart(2,"0")).join("");
 }
 export function calculateCredits(inputTokens,outputTokens,inputRate,outputRate){return Math.max(1,Math.ceil((inputTokens/1000)*inputRate+(outputTokens/1000)*outputRate));}
-async function readBody(req,limit=16_384){
+export async function readBody(req,limit=16_384){
   const declared=Number(req.headers.get("content-length")||0);
   if(declared>limit) throw Object.assign(new Error("body_too_large"),{status:413});
   const text=await req.text();
@@ -206,7 +206,7 @@ async function adminAction(env,user,body,token){
   const action=String(body.action||"");
   if(action==="admin-data"){
     const [stats,users,orders,packs,settingsRows,ledger,messages]=await Promise.all([
-      fetch(env.SUPABASE_URL+"/rest/v1/rpc/admin_stats",{method:"POST",headers:{apikey:"sb_publishable__GL22Bcvbk0VC-uhhrsQ1Q_9edvV9OD",authorization:"Bearer "+token,"content-type":"application/json"},body:"{}"}).then(async r=>{if(!r.ok)throw new Error("admin_stats_failed");return {data:await r.json(),res:r}}),
+      sbJson(env,"/rest/v1/rpc/admin_stats",{method:"POST",body:"{}"}),
       sbJson(env,"/rest/v1/profiles?select=id,email,full_name,credits,is_admin,is_banned,created_at&order=created_at.desc&limit=200"),
       sbJson(env,"/rest/v1/orders?select=id,user_id,pack_id,razorpay_order_id,razorpay_payment_id,amount_paise,credits,status,created_at&order=created_at.desc&limit=200"),
       sbJson(env,"/rest/v1/credit_packs?select=id,name,credits,price_paise,is_popular,active,sort&order=sort"),
@@ -214,19 +214,19 @@ async function adminAction(env,user,body,token){
       sbJson(env,"/rest/v1/credit_ledger?select=id,user_id,delta,reason,ref,created_at&order=created_at.desc&limit=1000"),
       sbJson(env,"/rest/v1/messages?select=created_at,credits_used&order=created_at.desc&limit=1000")
     ]);
-    
     const allOrders=orders.data||[],allLedger=ledger.data||[],allMessages=messages.data||[];
     const daily={};
     for(let i=29;i>=0;i--){const day=new Date(Date.now()-i*86400000).toISOString().slice(0,10);daily[day]={date:day,messages:0,credits_used:0,revenue_inr:0};}
     for(const m of allMessages){const day=String(m.created_at||"").slice(0,10);if(daily[day]){daily[day].messages++;daily[day].credits_used+=Number(m.credits_used||0);}}
+    for(const l of allLedger){const day=String(l.created_at||"").slice(0,10);if(daily[day]&&l.reason==="chat"&&Number(l.delta)<0&&!allMessages.some(m=>String(m.created_at||"").slice(0,10)===day))daily[day].credits_used+=-Number(l.delta);}
     for(const o of allOrders){const day=String(o.created_at||"").slice(0,10);if(daily[day]&&o.status==="paid")daily[day].revenue_inr+=Number(o.amount_paise||0)/100;}
     return {stats:stats.data||{},users:users.data||[],orders:allOrders,packs:packs.data||[],settings:settingsRows.data||[],ledger:allLedger,daily_usage:Object.values(daily)};
   }
   if(action==="admin-user"){
     const id=String(body.user_id||"");if(!UUID.test(id))throw Object.assign(new Error("invalid_user"),{status:400});
-    const update={};if(typeof body.is_banned==="boolean")update.is_banned=body.is_banned;if(typeof body.is_admin==="boolean")update.is_admin=body.is_admin;
-    if(!Object.keys(update).length)throw Object.assign(new Error("invalid_update"),{status:400});
-    await sbJson(env,"/rest/v1/profiles?id=eq."+id,{method:"PATCH",body:JSON.stringify(update)});return {saved:true};
+    if(typeof body.is_banned==="boolean"){await sbJson(env,"/rest/v1/profiles?id=eq."+id,{method:"PATCH",body:JSON.stringify({is_banned:body.is_banned})});return {saved:true};}
+    if(typeof body.is_admin==="boolean")throw Object.assign(new Error("admin_role_change_disabled_use_owner_console"),{status:403});
+    throw Object.assign(new Error("invalid_update"),{status:400});
   }
   if(action==="admin-credit"){
     const id=String(body.user_id||""),amount=Math.floor(Number(body.amount));
@@ -290,7 +290,7 @@ export default {
         const token=(req.headers.get("authorization")||"").split(" ").slice(1).join(" ");const result=await adminAction(env,user,{action:"admin-data"},token);return json({stats:result.stats,daily_usage:result.daily_usage},200,cors);
       }
       if(path==="/api/admin/users"&&req.method==="GET"){
-        const q=(url.searchParams.get("q")||"").replace(/[,%()]/g,"").slice(0,80),page=Math.max(1,Number(url.searchParams.get("page")||1));
+        const q=(url.searchParams.get("q")||"").replace(/[,%()]/g,"").slice(0,80),page=Math.max(1,Math.min(2000,Number(url.searchParams.get("page")||1)||1));
         const {data}=await sbJson(env,"/rest/v1/profiles?select=id,email,full_name,credits,is_admin,is_banned,created_at&or=(email.ilike.*"+encodeURIComponent(q)+"*,full_name.ilike.*"+encodeURIComponent(q)+"*)&order=created_at.desc&limit=50&offset="+((page-1)*50));
         return json({users:data||[]},200,cors);
       }
