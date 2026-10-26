@@ -385,6 +385,19 @@ html:not(.mobile-layout) #app{grid-template-columns:280px minmax(0,1fr)}
  #app>aside.profile-open #profilePanel{inset:calc(64px + env(safe-area-inset-top,0px)) 8px calc(60px + env(safe-area-inset-bottom,0px))}
 }
 
+
+/* Compact, aligned sidebar account control */
+#app>aside>.me{
+ display:flex!important;align-items:center;gap:.55rem;
+ min-height:44px!important;padding:.38rem .55rem!important;
+ margin-top:.35rem!important;border:1px solid var(--line);
+ border-radius:10px!important;background:transparent;
+}
+#app>aside>.me .av{width:30px!important;height:30px!important;font-size:.82rem}
+#app>aside>.me #nm{font-size:.88rem;line-height:1.15}
+#app>aside>.me .small{font-size:.74rem}
+#app>aside>.me>span:nth-child(2){min-width:0;overflow:hidden}
+
 </style>
 </head>
 <body>
