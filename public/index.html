@@ -288,6 +288,11 @@ html.mobile-layout #app .m{gap:.65rem;margin-bottom:1.25rem}
 html.mobile-layout #app .m.bot .t{font-size:1.03rem;line-height:1.8}
 html.mobile-layout #app .m:not(.bot) .t{font-size:.98rem}
 html:not(.mobile-layout) #app{grid-template-columns:280px minmax(0,1fr)}
+
+/* Safety guard: account/profile UI belongs only to the sidebar, never the chat column. */
+#app main .me,#app main #av,#app main #nm,#app main .profile-card,#app main [data-profile]{display:none!important}
+#app main .m:not(.bot)>.av{display:none!important}
+#app #side>.me{display:flex!important}
 </style>
 </head>
 <body>
