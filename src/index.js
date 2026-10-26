@@ -164,7 +164,12 @@ async function chat(req,env,ctx,cors,user,token){
   const rin=Math.max(0,Number(S.credits_per_1k_input??1)),rout=Math.max(0,Number(S.credits_per_1k_output??4));
   const maxOut=Math.max(64,Math.min(2048,Math.floor((p.credits/Math.max(rout,1))*1000)));
   const gr=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":streamGenerateContent?alt=sse",{method:"POST",headers:{"content-type":"application/json","x-goog-api-key":env.GEMINI_API_KEY},body:JSON.stringify({systemInstruction:{parts:[{text:String(S.system_prompt??"")} ]},contents,generationConfig:{maxOutputTokens:maxOut}})});
-  if(!gr.ok||!gr.body)return json({error:"ai_error"},502,cors);
+  if(!gr.ok||!gr.body){
+    const detail=await gr.text().catch(()=>"");
+    console.error("gemini_upstream_error",JSON.stringify({status:gr.status,model,body:detail.slice(0,1200)}));
+    const upstreamCode=gr.status===401||gr.status===403?"ai_auth_error":gr.status===404?"ai_model_unavailable":gr.status===429?"ai_rate_limited":"ai_error";
+    return json({error:upstreamCode},502,cors);
+  }
   if(!chatId){
     const {data:c}=await sbJson(env,"/rest/v1/chats",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({user_id:user.id,title:text.slice(0,36)})});
     if(!Array.isArray(c)||!c[0])return json({error:"chat_save_failed"},500,cors);chatId=c[0].id;
@@ -200,7 +205,12 @@ async function chat(req,env,ctx,cors,user,token){
         p_user:user.id,p_chat:chatId,p_message:text||'[Image attached]',p_answer:full,p_tokens_in:tin,p_tokens_out:tout,p_credits:cost
       })});
       await sendEvent({type:"done",credits_left:deducted.data,credits_used:cost});
-    }catch(e){try{await sendEvent({type:"error",error:"ai_error"})}catch{}}
+    }catch(e){
+      const reason=String(e?.message||e||"unknown_error");
+      console.error("chat_pipeline_error",JSON.stringify({reason:reason.slice(0,300),model}));
+      const publicError=reason==="empty_reply"?"empty_reply":reason==="insufficient_credits"?"no_credits":reason.startsWith("supabase_")?"database_error":reason==="chat_not_found"?"chat_not_found":"ai_error";
+      try{await sendEvent({type:"error",error:publicError})}catch{}
+    }
     finally{try{await writer.close()}catch{}}
   })());
   return new Response(readable,{headers:{...cors,"content-type":"text/event-stream; charset=utf-8","cache-control":"no-cache, no-transform","x-content-type-options":"nosniff"}});
@@ -291,7 +301,7 @@ export default {
   if(path==="/api/razorpay-webhook"&&req.method==="POST")return handleWebhook(req,env);
   if(path==="/api/chat"&&req.method==="POST"){
    try{const {user,token}=await authUser(req,env);return await chat(req,env,ctx,cors,user,token)}
-   catch(e){return json({error:e.status===401?"unauthorized":e.status===413?"body_too_large":"server_error"},e.status||500,cors)}
+   catch(e){console.error("chat_request_error",String(e?.message||e||"unknown_error").slice(0,300));return json({error:e.status===401?"unauthorized":e.status===413?"body_too_large":"server_error"},e.status||500,cors)}
   }
   if(path==="/api/order"&&req.method==="POST"||path==="/api/verify"&&req.method==="POST"||path==="/api"&&req.method==="POST"||path.startsWith("/api/admin/")){
    try{
