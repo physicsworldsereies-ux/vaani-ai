@@ -187,7 +187,7 @@ grant execute on function public.admin_stats() to authenticated;
 
 insert into public.app_settings(key,value) values
  ('system_prompt','"You are Vaani, a helpful assistant. Reply in the language used by the user."'),
- ('model','"gemini-2.5-flash"'),
+ ('model','"gemini-3.5-flash"'),
  ('free_credits','50'),
  ('credits_per_1k_input','1'),
  ('credits_per_1k_output','4'),

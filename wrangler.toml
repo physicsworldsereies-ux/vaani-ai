@@ -1,0 +1,12 @@
+name = "vaani-ai"
+main = "src/index.js"
+compatibility_date = "2026-10-26"
+
+[vars]
+SUPABASE_URL = "https://voohqnqyspxdlyaqygof.supabase.co"
+ALLOWED_ORIGIN = "https://vaani-ai.radhadevi05051980.workers.dev"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/health"]
