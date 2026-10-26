@@ -369,9 +369,10 @@ sb.auth.onAuthStateChange((ev,session)=>{
   if(session&&!user){
     document.documentElement.classList.add('direct-chat');
     $('land').classList.add('hide');
-    void enter(session).finally(()=>document.documentElement.classList.remove('direct-chat'));
+    void enter(session);
   }
   else if(!session&&user){
+    document.documentElement.classList.remove('direct-chat');
     user=null;prof=null;chats=[];cur=null;
     $('app').classList.add('hide');$('land').classList.remove('hide');
   }
