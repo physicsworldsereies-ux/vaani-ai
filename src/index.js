@@ -269,6 +269,15 @@ async function adminAction(env,user,body,token){
 async function apiAction(req,env,user,body,token){
   const action=String(body.action||"");
   if(action.startsWith("admin-"))return adminAction(env,user,body,token);
+  if(action==="delete-chat"){
+    const chatId=String(body.chat_id||"");
+    if(!UUID.test(chatId))throw Object.assign(new Error("invalid_chat_id"),{status:400});
+    const {data:owned}=await sbJson(env,"/rest/v1/chats?id=eq."+chatId+"&user_id=eq."+user.id+"&select=id&limit=1");
+    if(!owned?.length)throw Object.assign(new Error("chat_not_found"),{status:404});
+    await sbJson(env,"/rest/v1/messages?chat_id=eq."+chatId+"&user_id=eq."+user.id,{method:"DELETE"});
+    await sbJson(env,"/rest/v1/chats?id=eq."+chatId+"&user_id=eq."+user.id,{method:"DELETE"});
+    return {deleted:true,chat_id:chatId};
+  }
   if(action==="create-order")return makeOrder(env,user,body.pack_id);
   if(action==="verify-payment")return verifyPayment(env,user,body);
   if(action==="chat")throw Object.assign(new Error("use_chat_endpoint"),{status:400});
