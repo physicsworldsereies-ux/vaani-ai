@@ -485,6 +485,24 @@ html,body{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
  #mod .admin-stats{grid-template-columns:minmax(0,1fr)}
 }
 
+
+/* Final layout policy: no desktop split-pane or desktop-only expand control. */
+#app,#app.full-chat{display:grid!important;grid-template-columns:minmax(0,1fr)!important;width:100%!important;max-width:100%!important;height:100dvh!important;height:100svh!important;min-height:0!important;overflow:hidden!important}
+#app>main{grid-column:1/-1!important;width:100%!important;min-width:0!important;min-height:0!important}
+#app .expand-chat{display:none!important}
+#app>aside{position:fixed!important;inset:0 auto 0 0!important;width:min(82vw,300px)!important;max-width:300px!important;height:100dvh!important;height:100svh!important;z-index:1000!important;transform:translateX(-105%);overflow-y:auto!important;overscroll-behavior:contain;background:#080808!important;padding:calc(.7rem + env(safe-area-inset-top,0px)) .7rem calc(.7rem + env(safe-area-inset-bottom,0px))!important}
+#app>aside.open{transform:translateX(0)!important;display:flex!important}
+#app #msgs{flex:1 1 auto!important;min-width:0!important;min-height:0!important;overflow:auto!important}
+#app .comp{flex:0 0 auto!important;width:100%!important;min-width:0!important}
+#app .box{width:100%!important;max-width:none!important;min-width:0!important}
+#app .box textarea{width:0!important;min-width:0!important;flex:1 1 auto!important;font-size:16px!important}
+@media(min-width:821px){
+ #app>aside{width:min(82vw,300px)!important;max-width:300px!important}
+ #app .top .menu{display:grid!important}
+ #app #msgs{padding:clamp(.8rem,3vw,1.5rem)!important}
+ #app .comp{padding:.65rem clamp(.7rem,3vw,1.25rem) calc(.65rem + env(safe-area-inset-bottom,0px))!important}
+}
+
 </style>
 </head>
 <body>
@@ -516,7 +534,7 @@ html,body{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
 <div class="hist" id="hist"></div>
 <div class="cred"><div><span class="small">Credits left</span><br><b id="cr">50</b></div><button class="btn pri" style="padding:.5rem .9rem" onclick="buyOpen()">Top up</button></div>
 <button class="me" onclick="profOpen()"><span class="av" id="av">D</span><span><b id="nm">Demo User</b><br><span class="small">Profile</span></span></button><section id="profilePanel" aria-label="Account profile"></section></aside>
-<main><div class="top"><button class="ic menu" onclick="document.getElementById('side').classList.toggle('open')" aria-label="Open sidebar">☰</button><b id="ct">New chat</b><button class="ic expand-chat" id="expandChatBtn" onclick="toggleFullChat()" aria-label="Expand chat" title="Full chat screen">⛶</button></div>
+<main><div class="top"><button class="ic menu" onclick="document.getElementById('side').classList.toggle('open')" aria-label="Open sidebar">☰</button><b id="ct">New chat</b></div>
 <div id="msgs"><div class="col" id="col"></div></div>
 <div class="comp"><div id="imagePreview" class="image-preview"></div><div class="box"><div class="attach-tools"><button class="ic" aria-label="Choose image from gallery" title="Gallery" onclick="$('galleryInput').click()">▧</button><button class="ic" aria-label="Take a photo" title="Camera" onclick="$('cameraInput').click()">📷</button></div><input id="galleryInput" type="file" accept="image/*" multiple hidden onchange="pickImages(this)"><input id="cameraInput" type="file" accept="image/*" capture="environment" hidden onchange="pickImages(this)">
 <textarea id="in" rows="1" placeholder="Message Vaani or add an image"></textarea><button class="ic send" id="sb" aria-label="Send">➤</button></div>
