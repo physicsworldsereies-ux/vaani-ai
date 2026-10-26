@@ -1,57 +1,73 @@
 # Vaani production setup package
 
-This package updates the supplied Vaani single-page app to use a server-side Supabase Edge Function for Gemini chat and Razorpay payments, adds an admin panel, and includes a security-hardening migration.
+This repository's current deployment architecture is:
+- **Frontend:** root `index.html`, a static site suitable for Cloudflare Pages.
+- **Backend:** Supabase Edge Function `supabase/functions/vaani-api/index.ts`.
+- **Database:** Supabase Postgres, with security migration under `supabase/migrations/`.
+- **Payments:** Razorpay orders and signed webhook handled by the Edge Function.
+- **AI:** Gemini called server-side by the Edge Function.
 
-## Important status
+Do not deploy the older Cloudflare Worker from the supplied ZIP alongside this backend without intentionally migrating the architecture. The current frontend calls `https://<project-ref>.supabase.co/functions/v1/vaani-api`, not a Cloudflare Worker URL.
 
-- The HTML now calls `vaani-api` for AI responses and payments; it will not fake AI answers or successful payments.
-- A deployed Supabase Edge Function and the migration are required for those calls to work.
-- Razorpay and Gemini secrets are intentionally not embedded in the browser or this repository.
-- Google OAuth must be configured in Supabase Auth and its redirect URLs must include the deployed website URL.
-- The admin panel appears only for profiles with `is_admin = true`. Set the first admin manually in the Supabase SQL editor after verifying the exact account ID/email.
+## Repository contents and database setup
 
-## 1. Supabase migration
+- `index.html`: current frontend, Google OAuth UI, chat, credit packs, Razorpay checkout, admin interface, legal dialogs.
+- `supabase/functions/vaani-api/index.ts`: authenticated chat/payment/admin API and Razorpay webhook.
+- `supabase/migrations/20261025_secure_credits_admin.sql`: security hardening for an existing schema.
+- `supabase/bootstrap/initial_schema.sql`: initial schema for a **brand-new/empty Supabase project only**. It is intentionally outside the migrations folder so it is not automatically applied to an already populated production database.
 
-Review and apply `supabase/migrations/20261025_secure_credits_admin.sql` to project `voohqnqyspxdlyaqygof`. This migration deliberately removes direct browser write privileges for chat messages, orders, credit ledger, credit packs, and admin settings. The updated frontend uses the Edge Function for those operations. Back up the project and test in a branch before production application.
+### Important: do not blindly run the bootstrap against the existing live database
 
-## 2. Deploy Edge Function
+The bootstrap creates tables, policies, triggers, functions, defaults and sample credit packs. If your current Supabase project already has these objects, running the bootstrap there can fail on existing objects or create duplicate setup. First inspect the live database and migration history. For a fresh project, run the bootstrap once in the SQL Editor, then apply the security migration. For an existing project, verify its schema against the bootstrap and review/apply only the necessary changes, including the security migration, after taking a backup.
 
-Deploy `supabase/functions/vaani-api/index.ts` as function `vaani-api` with platform JWT verification **disabled** (`verify_jwt = false`) because the same function receives Razorpay webhook calls. The function itself validates a Supabase access token for every non-webhook action, and validates the Razorpay HMAC signature for `/webhook`. Keep the service role key secret. Do not disable the function’s internal authentication checks.
+The security migration revokes direct browser writes to credit/payment/admin data and leaves those operations to the Edge Function. Review the SQL and test before applying to production.
 
-## 3. Configure Edge Function secrets
+## Deploy the Edge Function
 
-Set these as Supabase Edge Function secrets, never in HTML:
+Deploy `supabase/functions/vaani-api/index.ts` as `vaani-api` with platform JWT verification **disabled** (`verify_jwt = false`) because Razorpay webhooks do not carry Supabase user JWTs. The function itself validates a Supabase access token for every non-webhook action and validates the Razorpay HMAC signature for `/webhook`. Do not disable those internal checks.
+
+## Required Supabase Edge Function secrets
+
+Set these in Supabase Dashboard → Edge Functions → Secrets, never in HTML or Git:
 
 - `GEMINI_API_KEY` — Google AI Studio API key
-- `RAZORPAY_KEY_ID` — Razorpay public key ID
-- `RAZORPAY_KEY_SECRET` — Razorpay secret key
-- `RAZORPAY_WEBHOOK_SECRET` — a separate webhook secret configured in Razorpay
+- `RAZORPAY_KEY_ID` — Razorpay key ID
+- `RAZORPAY_KEY_SECRET` — Razorpay secret
+- `RAZORPAY_WEBHOOK_SECRET` — separate secret configured for the webhook
 - `APP_ORIGIN` — exact deployed website origin, e.g. `https://your-domain.example`
 
-Supabase automatically provides `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to Edge Functions. Confirm they are available in your project runtime. Never expose `SUPABASE_SERVICE_ROLE_KEY` in frontend code.
+Supabase provides `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to Edge Functions. Confirm them in the runtime. Never expose `SUPABASE_SERVICE_ROLE_KEY` in frontend code.
 
-## 4. Razorpay dashboard
+## Razorpay dashboard
 
-Create a webhook pointing to `https://voohqnqyspxdlyaqygof.supabase.co/functions/v1/vaani-api/webhook`. Subscribe to `payment.captured` and `order.paid`, use a strong webhook secret, and configure allowed payment methods in Razorpay. Test with Razorpay test mode first. Switch to live credentials only after successful end-to-end tests and account approval.
+Configure webhook URL:
+`https://voohqnqyspxdlyaqygof.supabase.co/functions/v1/vaani-api/webhook`
 
-## 5. Google OAuth
+Subscribe to `payment.captured` and `order.paid`. Use a separate strong webhook secret. Test end-to-end in Razorpay test mode before enabling live credentials.
 
-In Supabase Dashboard → Authentication → Providers, enable Google and configure the OAuth client ID/secret. In Authentication → URL Configuration, set the production Site URL and add the exact production URL plus local preview URL to Redirect URLs. Google must remain the only login option in the UI.
+## Google OAuth
 
-## 6. First admin
+In Supabase Dashboard → Authentication → Providers, enable Google and configure the OAuth client ID/secret. In Authentication → URL Configuration, set the production Site URL and add the exact production URL plus any required preview URL to Redirect URLs. The UI is intended to offer Google login only.
 
-After confirming the exact user row, run a narrowly scoped SQL update in the Supabase SQL editor:
+## First admin
 
+After signing in with the intended Google account and verifying its profile row, grant admin only to that exact account:
 ```sql
 UPDATE public.profiles SET is_admin = true WHERE email = 'YOUR_VERIFIED_ADMIN_EMAIL';
-```
+``
+Do not make all users admins.
 
-Replace the example with your own verified account email. Do not make every user an admin.
+## Cloudflare Pages
 
-## 7. Host the frontend
+Connect `physicsworldsereies-ux/vaani-ai` to Cloudflare Pages and set the project root/build settings for a static HTML site (root directory `/`, no build command, output directory `/`). The file `index.html` is at repository root. Confirm the final Pages domain matches `APP_ORIGIN` and Supabase Auth redirect configuration. This repository inspection does not prove that a Pages project or deployment already exists.
 
-Host `index.html` on a static host (Cloudflare Pages, Netlify, or another static host). Ensure the `APP_ORIGIN` secret and Supabase Auth redirect URLs match the exact domain. This package does not claim that the site has been published to a public domain.
+## Verification still required
 
-## Admin panel
+Repository contents alone cannot prove live Supabase or Cloudflare state. Verify separately:
+1. Whether the security migration is applied and the live schema/RLS matches it.
+2. Whether the Edge Function is deployed and its secrets exist.
+3. Whether Google OAuth callback/redirect settings work for the exact site URL.
+4. Whether Razorpay test-mode order creation, checkout, webhook signature, and idempotent credit fulfilment work end-to-end.
+5. Whether Cloudflare Pages points at this repository and deploys the root `index.html`.
 
-The admin panel provides dashboard stats, user ban/unban and role controls, credit adjustments, pack price/credit activation controls, settings (system prompt, model, maintenance mode and credit rates), orders, and ledger. All write actions go through the server-side function, which verifies the signed-in user's `profiles.is_admin` value.
+Never commit secrets, local `.env` files, Supabase service-role keys, or Razorpay secrets.
