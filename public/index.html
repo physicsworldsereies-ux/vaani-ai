@@ -124,6 +124,13 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;back
 .tag{position:absolute;top:-11px;left:1.2rem;background:var(--acc);color:var(--onacc);font-size:.78rem;font-weight:700;padding:.15rem .7rem;border-radius:99px}
 aside{background:linear-gradient(180deg,var(--bg2),var(--bg))}
 .hist button.on{box-shadow:inset 3px 0 var(--acc)}
+.hist-row{display:flex;align-items:center;gap:2px;min-width:0;border-radius:8px}
+.hist-row:hover,.hist-row.active{background:#171717}
+.hist-row .hist-open{flex:1;min-width:0;text-align:left;padding:.5rem .45rem .5rem .7rem;border-radius:8px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:transparent;border:0;font:inherit;cursor:pointer}
+.hist-row.active .hist-open,.hist-row .hist-open:hover{color:#fff}
+.hist-row .hist-delete{flex:0 0 22px;width:22px;height:22px;padding:0;margin-right:4px;border:0;border-radius:5px;background:transparent;color:#777;font-size:12px;line-height:1;cursor:pointer;opacity:.65}
+.hist-row .hist-delete:hover{background:#292929;color:#ff7777;opacity:1}
+
 .box{border-radius:20px;box-shadow:0 18px 40px -24px rgba(0,0,0,.6)}
 .m.bot .av{background:linear-gradient(135deg,var(--acc),var(--acc2))}
 .dots{display:inline-flex;gap:4px;padding-top:.5rem}.dots i{width:7px;height:7px;border-radius:50%;background:var(--mut);animation:bl .9s infinite}.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
@@ -325,10 +332,18 @@ async function open_(id){cur=chats.find(c=>c.id===id);
 if(cur.m===null){const r=await sb.from('messages').select('role,content').eq('chat_id',id).order('created_at');cur.m=(r.data||[]).map(x=>({r:x.role==='user'?'u':'b',x:x.content}))}
 draw();$('side').classList.remove('open')}
 function draw(){
-$('hist').innerHTML='<small>History</small>'+chats.map(c=>`<button class="${cur&&c.id===cur.id?'on':''}" onclick="open_('${c.id}')">${esc(c.t)}</button>`).join('');
-$('ct').textContent=cur.t;
-$('col').innerHTML=cur.m.length?cur.m.map(row).join(''):`<div class="empty"><h2>What can I help with?</h2><div class="sug">${['Summarise a long article','Plan a 3-day trip','Fix my resume','Explain a tough topic'].map(s=>`<button onclick="ask('${s}')">${s}</button>`).join('')}</div></div>`;
-typesetMath();$('msgs').scrollTop=1e9}
+ $('hist').innerHTML='<small>History</small>'+chats.map(c=>`<div class="hist-row ${cur&&c.id===cur.id?'active':''}"><button class="hist-open" title="${esc(c.t)}" onclick="open_('${c.id}')">${esc(c.t)}</button><button class="hist-delete" title="Delete chat" aria-label="Delete chat: ${esc(c.t)}" onclick="deleteChat('${c.id}',event)">×</button></div>`).join('');
+ $('ct').textContent=cur.t;
+ $('col').innerHTML=cur.m.length?cur.m.map(row).join(''):`<div class="empty"><h2>What can I help with?</h2><div class="sug">${['Summarise a long article','Plan a 3-day trip','Fix my resume','Explain a tough topic'].map(s=>`<button onclick="ask('${s}')">${s}</button>`).join('')}</div></div>`;
+ typesetMath();$('msgs').scrollTop=1e9}
+async function deleteChat(id,event){
+ if(event)event.stopPropagation();
+ if(busy){toast('Wait for the current response to finish.');return}
+ const item=chats.find(c=>c.id===id);if(!item)return;
+ if(!confirm('Delete this conversation from history? This cannot be undone.'))return;
+ try{await api('delete-chat',{chat_id:id});chats=chats.filter(c=>c.id!==id);if(cur&&cur.id===id)newChat();else draw();toast('Chat deleted.');}
+ catch(e){toast('Could not delete chat: '+(e.message||'Please try again'))}
+}
 const row=m=>`<div class="m ${m.r==='b'?'bot':''}"><span class="av">${m.r==='b'?'V':'U'}</span><div class="t">${m.r==='b'?formatReply(m.x):(m.imgs&&m.imgs.length?'<div class="sent-images">'+imageMarkup(m.imgs)+'</div>':'')+esc(m.x)}</div></div>`;
 function ask(t){$('in').value=t;send()}
 async function send(){
