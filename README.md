@@ -7,7 +7,7 @@ The existing `vaani-ai` Worker serves both the static site and API from one orig
 - `public/assets/stars.webp`: star texture.
 - `src/index.js`: `POST /api/chat` SSE stream, Razorpay order/webhook/verify, admin API and static-site routing.
 - `wrangler.toml`: Worker configuration for `vaani-ai`.
-- `supabase/migrations/20261026_worker_hardening.sql`: make credit deduction atomic/fail-closed. Review against live schema and apply manually before real usage.
+- `supabase/migrations/20261026_worker_hardening.sql`: make chat persistence + credit deduction transactional and fail-closed. Review against live schema and apply manually before real usage.
 - `public/privacy.html`, `public/terms.html`, `public/refund.html`, `public/contact.html`: legal drafts with explicit owner TODOs.
 
 ## Local run
