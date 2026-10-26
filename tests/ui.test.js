@@ -8,6 +8,13 @@ describe("Vaani chat UI", () => {
     expect(root).toBe(publicHtml);
   });
 
+  it("only renders the profile admin shortcut for an active authorized admin profile", () => {
+    const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+    expect(html).toContain("prof&&prof.is_admin===true&&!prof.is_banned");
+    expect(html).toContain("onclick=\"closeM();adminOpen()\"");
+    expect(html).toContain("Admin dashboard");
+  });
+
   it("styles the chat canvas black and AI replies yellow", () => {
     const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
     expect(html).toContain("--chat-black:#000");
