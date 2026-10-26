@@ -238,9 +238,19 @@ html.direct-chat *,html.direct-chat *::before,html.direct-chat *::after{animatio
   #app .attach-tools .ic{width:32px}
   #app .box .ic{width:34px}
 }
+
+#auth-loader{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#000;visibility:visible;opacity:1}
+#auth-loader.hide{display:none!important}
+#auth-loader .loader-dots{display:flex;align-items:center;gap:7px}
+#auth-loader .loader-dots span{width:7px;height:7px;border-radius:50%;background:#fff;opacity:.25;animation:auth-dot 1s ease-in-out infinite}
+#auth-loader .loader-dots span:nth-child(2){animation-delay:.16s}
+#auth-loader .loader-dots span:nth-child(3){animation-delay:.32s}
+@keyframes auth-dot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+
 </style>
 </head>
 <body>
+<div id="auth-loader" role="status" aria-label="Loading chat"><div class="loader-dots" aria-hidden="true"><span></span><span></span><span></span></div></div>
 <div class="stars"></div>
 <div class="orb o1"></div><div class="orb o2"></div>
 <div id="land">
@@ -365,35 +375,54 @@ async function enter(session){
 }
  finally{entering=false}
 }
-sb.auth.onAuthStateChange((ev,session)=>{
-  if(session&&!user){
+let chatHandoff=null;
+async function showChatForSession(session){
+  if(chatHandoff)return chatHandoff;
+  chatHandoff=(async()=>{
     document.documentElement.classList.add('direct-chat');
     $('land').classList.add('hide');
-    void enter(session);
-  }
+    if(!user) await enter(session);
+    while(entering) await new Promise(resolve=>setTimeout(resolve,20));
+    if(user){
+      $('land').classList.add('hide');
+      $('app').classList.remove('hide');
+    }
+    $('auth-loader').classList.add('hide');
+    document.documentElement.classList.remove('auth-pending');
+  })().catch(e=>{
+    console.error('auth_handoff_error',String(e?.message||e||'unknown').slice(0,200));
+    $('auth-loader').classList.add('hide');
+    document.documentElement.classList.remove('auth-pending');
+    $('land').classList.add('hide');
+    if(user)$('app').classList.remove('hide');
+    else $('land').classList.remove('hide');
+  }).finally(()=>{chatHandoff=null});
+  return chatHandoff;
+}
+sb.auth.onAuthStateChange((ev,session)=>{
+  if(session&&!user){void showChatForSession(session)}
   else if(!session&&user){
     document.documentElement.classList.remove('direct-chat');
     user=null;prof=null;chats=[];cur=null;
     $('app').classList.add('hide');$('land').classList.remove('hide');
+    $('auth-loader').classList.add('hide');
   }
 });
-/* Restore auth before revealing the landing page, preventing the post-login homepage flash. */
+/* Resolve the saved session before revealing either homepage or chat. */
 (async function bootAuth(){
   try{
     const {data:{session}}=await sb.auth.getSession();
     if(session){
-      document.documentElement.classList.add('direct-chat');
-      $('land').classList.add('hide');
-      await enter(session);
-      while(entering) await new Promise(resolve=>setTimeout(resolve,25));
-      /* Keep the handoff invisible until the authenticated chat is ready. */
-      if(user){$('land').classList.add('hide');$('app').classList.remove('hide')}
+      $('auth-loader').classList.remove('hide');
+      await showChatForSession(session);
     }else{
+      $('auth-loader').classList.add('hide');
       $('app').classList.add('hide');$('land').classList.remove('hide');
+      document.documentElement.classList.remove('auth-pending');
     }
   }catch(e){
+    $('auth-loader').classList.add('hide');
     $('app').classList.add('hide');$('land').classList.remove('hide');
-  }finally{
     document.documentElement.classList.remove('auth-pending');
   }
 })();
