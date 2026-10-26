@@ -181,18 +181,25 @@ async function chat(req,env,ctx,cors,user,token){
     try{
       await sendEvent({type:"meta",chat_id:chatId});
       const reader=gr.body.getReader(),decoder=new TextDecoder();let buffer="";
+      const processLine=async raw=>{
+        const line=raw.trim();
+        if(!line.startsWith("data:"))return;
+        let chunk;try{chunk=JSON.parse(line.slice(5).trim())}catch{return}
+        const delta=(chunk.candidates?.[0]?.content?.parts||[]).map(x=>x.text||"").join("");
+        if(delta){full+=delta;await sendEvent({type:"delta",text:delta})}
+        if(chunk.usageMetadata)usage=chunk.usageMetadata;
+      };
       for(;;){
-        const {done,value}=await reader.read();if(done)break;
+        const {done,value}=await reader.read();
+        if(done)break;
         buffer+=decoder.decode(value,{stream:true});let idx;
         while((idx=buffer.indexOf("\n"))>=0){
-          const line=buffer.slice(0,idx).trim();buffer=buffer.slice(idx+1);
-          if(!line.startsWith("data:"))continue;
-          let chunk;try{chunk=JSON.parse(line.slice(5).trim())}catch{continue}
-          const delta=(chunk.candidates?.[0]?.content?.parts||[]).map(x=>x.text||"").join("");
-          if(delta){full+=delta;await sendEvent({type:"delta",text:delta})}
-          if(chunk.usageMetadata)usage=chunk.usageMetadata;
+          const line=buffer.slice(0,idx);buffer=buffer.slice(idx+1);
+          await processLine(line);
         }
       }
+      buffer+=decoder.decode();
+      if(buffer.trim())await processLine(buffer);
       if(!full)throw new Error("empty_reply");
       const tin=Number(usage?.promptTokenCount||Math.ceil((text.length+history.reduce((n,m)=>n+m.content.length,0))/4));
       const tout=Number(usage?.candidatesTokenCount||Math.ceil(full.length/4));
