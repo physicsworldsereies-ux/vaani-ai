@@ -192,12 +192,9 @@ async function chat(req,env,ctx,cors,user,token){
       if(!latest||latest.is_banned||latest.credits<cost){
         await sendEvent({type:"error",error:latest?.is_banned?"banned":"no_credits"});return;
       }
-      const saved=await sbJson(env,"/rest/v1/messages",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify([
-        {chat_id:chatId,user_id:user.id,role:"user",content:text,tokens_in:tin,tokens_out:0,credits_used:0},
-        {chat_id:chatId,user_id:user.id,role:"assistant",content:full,tokens_in:0,tokens_out:tout,credits_used:cost}
-      ])});
-      const deducted=await sbJson(env,"/rest/v1/rpc/deduct_credits",{method:"POST",body:JSON.stringify({p_user:user.id,p_amount:cost,p_ref:chatId})});
-      await sb(env,"/rest/v1/chats?id=eq."+chatId+"&user_id=eq."+user.id,{method:"PATCH",body:JSON.stringify({updated_at:new Date().toISOString()})});
+      const deducted=await sbJson(env,"/rest/v1/rpc/save_chat_and_deduct",{method:"POST",body:JSON.stringify({
+        p_user:user.id,p_chat:chatId,p_message:text,p_answer:full,p_tokens_in:tin,p_tokens_out:tout,p_credits:cost
+      })});
       await sendEvent({type:"done",credits_left:deducted.data,credits_used:cost});
     }catch(e){try{await sendEvent({type:"error",error:"ai_error"})}catch{}}
     finally{try{await writer.close()}catch{}}
