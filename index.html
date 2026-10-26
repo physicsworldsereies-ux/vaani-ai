@@ -200,7 +200,6 @@ let qi=0,dc=50;function loop(){const [q,a]=Q[qi++%Q.length],dq=$('dq'),da=$('da'
 loop();
 // ===== Supabase =====
 const SB_URL='https://voohqnqyspxdlyaqygof.supabase.co',SB_KEY='sb_publishable__GL22Bcvbk0VC-uhhrsQ1Q_9edvV9OD';
-const WORKER_URL=''; // Phase 4: Cloudflare Worker URL (Gemini) goes here
 const sb=window.supabase.createClient(SB_URL,SB_KEY);
 let user=null,prof=null,chats=[],cur=null,busy=false;
 function modal(h){$('mod').innerHTML=`<div class="ov" onclick="if(event.target===this)closeM()"><div class="mod" role="dialog" aria-modal="true">${h}</div></div>`}
