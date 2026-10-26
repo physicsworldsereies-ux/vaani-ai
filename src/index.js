@@ -302,7 +302,15 @@ export default {
         if(b.action==="ban"||typeof b.banned==="boolean"){if(!UUID.test(id))throw Object.assign(new Error("invalid_user"),{status:400});await sbJson(env,"/rest/v1/profiles?id=eq."+id,{method:"PATCH",body:JSON.stringify({is_banned:Boolean(b.banned)})});return json({saved:true},200,cors)}
         if(b.action==="credits"){const amount=Math.floor(Number(b.delta));if(!UUID.test(id)||!Number.isInteger(amount)||amount===0||Math.abs(amount)>100000)throw Object.assign(new Error("invalid_credit_delta"),{status:400});const {data}=await sbJson(env,"/rest/v1/rpc/admin_adjust_credits",{method:"POST",body:JSON.stringify({p_user:id,p_delta:amount,p_reason:String(b.reason||"admin_adjust").slice(0,120)})});return json({saved:true,credits:data},200,cors)}
       }
-      if(path==="/api/admin/settings"&&req.method==="GET"){const s=await settings(env);return json({settings:s},200,cors)}
+      if(path.startsWith("/api/admin/users/")&&req.method==="POST"){
+        const match=path.match(/^\/api\/admin\/users\/([0-9a-f-]{36})\/(ban|credits)$/i);
+        if(!match)return json({error:"not_found"},404,cors);
+        const id=match[1],operation=match[2].toLowerCase(),b=JSON.parse(await readBody(req));
+        if(operation==="ban"){if(typeof b.banned!=="boolean")throw Object.assign(new Error("invalid_ban_value"),{status:400});await sbJson(env,"/rest/v1/profiles?id=eq."+id,{method:"PATCH",body:JSON.stringify({is_banned:b.banned})});return json({saved:true},200,cors)}
+        const delta=Math.floor(Number(b.delta));if(!Number.isInteger(delta)||delta===0||Math.abs(delta)>100000)throw Object.assign(new Error("invalid_credit_delta"),{status:400});
+        const {data}=await sbJson(env,"/rest/v1/rpc/admin_adjust_credits",{method:"POST",body:JSON.stringify({p_user:id,p_delta:delta,p_reason:String(b.reason||"admin_adjust").slice(0,120)})});return json({saved:true,credits:data},200,cors);
+      }
+            if(path==="/api/admin/settings"&&req.method==="GET"){const s=await settings(env);return json({settings:s},200,cors)}
       if(path==="/api/admin/settings"&&req.method==="PUT"){const b=JSON.parse(await readBody(req));return json(await adminAction(env,user,{action:"admin-setting",...b}),200,cors)}
       if(path==="/api/admin/packs"&&(req.method==="GET"||req.method==="POST"||req.method==="PUT")){
         if(req.method==="GET"){const {data}=await sbJson(env,"/rest/v1/credit_packs?select=id,name,credits,price_paise,is_popular,active,sort&order=sort");return json({packs:data||[]},200,cors)}
