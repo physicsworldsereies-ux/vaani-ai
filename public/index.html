@@ -247,6 +247,11 @@ html.direct-chat *,html.direct-chat *::before,html.direct-chat *::after{animatio
 #auth-loader .loader-dots span:nth-child(3){animation-delay:.32s}
 @keyframes auth-dot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
 
+
+/* Keep the account profile compact in the sidebar; don't repeat it beside user messages. */
+#app aside .me{padding:.35rem .45rem;gap:.55rem;min-height:0}
+#app aside .me .av{width:28px;height:28px;font-size:.78rem}
+#app aside .me #nm{font-size:.88rem}
 </style>
 </head>
 <body>
@@ -448,7 +453,7 @@ async function deleteChat(id,event){
  try{await api('delete-chat',{chat_id:id});chats=chats.filter(c=>c.id!==id);if(cur&&cur.id===id)newChat();else draw();toast('Chat deleted.');}
  catch(e){toast('Could not delete chat: '+(e.message||'Please try again'))}
 }
-const row=m=>`<div class="m ${m.r==='b'?'bot':''}"><span class="av">${m.r==='b'?'V':'U'}</span><div class="t">${m.r==='b'?formatReply(m.x):(m.imgs&&m.imgs.length?'<div class="sent-images">'+imageMarkup(m.imgs)+'</div>':'')+esc(m.x)}</div></div>`;
+const row=m=>`<div class="m ${m.r==='b'?'bot':''}">${m.r==='b'?'<span class="av" aria-hidden="true">V</span>':''}<div class="t">${m.r==='b'?formatReply(m.x):(m.imgs&&m.imgs.length?'<div class="sent-images">'+imageMarkup(m.imgs)+'</div>':'')+esc(m.x)}</div></div>`;
 function ask(t){$('in').value=t;send()}
 async function send(){
 const v=$('in').value.trim(),imgs=pendingImages.slice();if((!v&&!imgs.length)||busy)return;if(!user){authOpen();return}if(prof.credits<1){buyOpen();return}
