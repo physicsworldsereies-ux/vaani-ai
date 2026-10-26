@@ -168,7 +168,8 @@ async function chat(req,env,ctx,cors,user,token){
     const detail=await gr.text().catch(()=>"");
     console.error("gemini_upstream_error",JSON.stringify({status:gr.status,model,body:detail.slice(0,1200)}));
     const upstreamCode=gr.status===401||gr.status===403?"ai_auth_error":gr.status===404?"ai_model_unavailable":gr.status===429?"ai_rate_limited":"ai_error";
-    return json({error:upstreamCode},502,cors);
+    const upstreamMessage=upstreamCode==="ai_auth_error"?"Gemini rejected the server API key. Check the key and API access.":upstreamCode==="ai_model_unavailable"?"The selected Gemini model is unavailable. Choose a supported model in Admin settings.":upstreamCode==="ai_rate_limited"?"Gemini is rate-limiting requests. Wait briefly and retry.":"The AI service failed. Please retry shortly.";
+    return json({error:upstreamMessage},502,cors);
   }
   if(!chatId){
     const {data:c}=await sbJson(env,"/rest/v1/chats",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({user_id:user.id,title:text.slice(0,36)})});
@@ -215,7 +216,7 @@ async function chat(req,env,ctx,cors,user,token){
     }catch(e){
       const reason=String(e?.message||e||"unknown_error");
       console.error("chat_pipeline_error",JSON.stringify({reason:reason.slice(0,300),model}));
-      const publicError=reason==="empty_reply"?"empty_reply":reason==="insufficient_credits"?"no_credits":reason.startsWith("supabase_")?"database_error":reason==="chat_not_found"?"chat_not_found":"ai_error";
+      const publicError=reason==="insufficient_credits"?"no_credits":reason==="empty_reply"?"The AI returned an empty response. Please retry.":reason.startsWith("supabase_")?"Chat saving or credit deduction failed. Please retry shortly.":reason==="chat_not_found"?"This chat could not be found. Start a new chat.":"The AI service failed. Please retry shortly.";
       try{await sendEvent({type:"error",error:publicError})}catch{}
     }
     finally{try{await writer.close()}catch{}}
