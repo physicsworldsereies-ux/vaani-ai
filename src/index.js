@@ -206,7 +206,7 @@ async function adminAction(env,user,body,token){
   const action=String(body.action||"");
   if(action==="admin-data"){
     const [stats,users,orders,packs,settingsRows,ledger,messages]=await Promise.all([
-      fetch(env.SUPABASE_URL+"/rest/v1/rpc/admin_stats",{method:"POST",headers:{apikey:"sb_publishable__GL22Bcvbk0VC-uhhrsQ1Q_9edvV9OD",authorization:"Bearer "+token,"content-type":"application/json"},body:"{}"}).then(async r=>{if(!r.ok)throw new Error("admin_stats_failed");return {data:await r.json(),res:r}}),
+      sbJson(env,"/rest/v1/rpc/admin_stats",{method:"POST",body:"{}"}),
       sbJson(env,"/rest/v1/profiles?select=id,email,full_name,credits,is_admin,is_banned,created_at&order=created_at.desc&limit=200"),
       sbJson(env,"/rest/v1/orders?select=id,user_id,pack_id,razorpay_order_id,razorpay_payment_id,amount_paise,credits,status,created_at&order=created_at.desc&limit=200"),
       sbJson(env,"/rest/v1/credit_packs?select=id,name,credits,price_paise,is_popular,active,sort&order=sort"),
