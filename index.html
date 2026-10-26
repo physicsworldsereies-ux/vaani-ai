@@ -189,8 +189,8 @@ textarea::placeholder{color:var(--mut)}
 <script>
 const $=id=>document.getElementById(id);
 let PACKS=[{id:1,c:100,p:99},{id:2,c:500,p:399,b:1},{id:3,c:1500,p:999},{id:4,c:5000,p:2999,b:0}];
-const API_URL=SB_URL+'/functions/v1/vaani-api';
-async function api(action, payload={}){const {data}=await sb.auth.getSession();const token=data.session?.access_token;if(!token)throw new Error('Please sign in again.');const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':SB_KEY},body:JSON.stringify({action,...payload})});const out=await res.json().catch(()=>({error:'Invalid server response'}));if(!res.ok)throw new Error(out.error||'Request failed');return out;}
+const WORKER_URL=location.origin;
+async function api(action,payload={}){const {data}=await sb.auth.getSession();const token=data.session?.access_token;if(!token)throw new Error('Please sign in again.');const res=await fetch(WORKER_URL+'/api',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({action,...payload})});const out=await res.json().catch(()=>({error:'Invalid server response'}));if(!res.ok)throw new Error(out.error||'Request failed');return out;}
 function renderPacks(){$('packs').innerHTML=PACKS.map(k=>`<div class="pack${k.b?' best':''}">${k.b?'<span class="tag">Most popular</span>':''}<h3>${k.c} <small>credits</small></h3><div class="pr">₹${Number(k.p).toFixed(2)}</div><button class="btn ${k.b?'pri':'ghost'}" style="width:100%" onclick="${'user'?'buyOpen()':'authOpen()'}">Choose</button></div>`).join('')}renderPacks();
 // theme
 $('th').onclick=()=>{const r=document.documentElement,d=getComputedStyle(r).colorScheme==='dark';r.dataset.theme=d?'light':'dark'};
@@ -243,9 +243,23 @@ const row=m=>`<div class="m ${m.r==='b'?'bot':''}"><span class="av">${m.r==='b'?
 function ask(t){$('in').value=t;send()}
 async function send(){
 const v=$('in').value.trim();if(!v||busy)return;if(!user){authOpen();return}if(prof.credits<1){buyOpen();return}
-busy=true;$('in').value='';const prior=cur.id;cur.m.push({r:'u',x:v});const b={r:'b',x:'Thinking…'};cur.m.push(b);draw();
-try{const result=await api('chat',{chat_id:prior||null,message:v});cur.id=result.chat_id;cur.t=cur.t==='New chat'?v.slice(0,36):cur.t;if(!prior){chats.unshift(cur)}b.x=result.answer;prof.credits=result.credits_remaining;$('cr').textContent=prof.credits;draw();
-}catch(e){cur.m.pop();cur.m.pop();draw();toast(e.message||'AI request failed')}
+busy=true;$('in').value='';const prior=cur.id;cur.m.push({r:'u',x:v});const b={r:'b',x:''};cur.m.push(b);draw();
+const te=$('col').lastElementChild.querySelector('.t');te.innerHTML='<span class="dots"><i></i><i></i><i></i></span>';
+try{
+ const {data:{session}}=await sb.auth.getSession();if(!session?.access_token)throw new Error('unauthorized');
+ const res=await fetch(WORKER_URL+'/api/chat',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({chat_id:prior||null,message:v})});
+ if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'AI request failed')}
+ const rd=res.body.getReader(),dec=new TextDecoder();let buf='';
+ for(;;){const {done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
+  while((i=buf.indexOf('\n\n'))>=0){const ev=buf.slice(0,i);buf=buf.slice(i+2);if(!ev.startsWith('data:'))continue;let j;try{j=JSON.parse(ev.slice(5).trim())}catch{continue}
+   if(j.type==='meta'){if(!cur.id){cur.id=j.chat_id;cur.t=v.slice(0,36);chats.unshift(cur)}}
+   else if(j.type==='delta'){b.x+=j.text;te.textContent=b.x;$('msgs').scrollTop=1e9}
+   else if(j.type==='done'){if(Number.isFinite(j.credits_left)){prof.credits=j.credits_left;$('cr').textContent=prof.credits}}
+   else if(j.type==='error')throw new Error(j.error||'AI request failed');
+  }
+ }
+ if(!b.x)throw new Error('AI returned an empty answer');draw();
+}catch(e){cur.m.pop();cur.m.pop();draw();const M={no_credits:'Your credits are finished. Please top up.',banned:'This account is blocked.',maintenance:'We are under maintenance. Please try again shortly.',unauthorized:'Please sign in again.',rate_limited:'Too many requests. Please wait a moment.'};toast(M[e.message]||e.message||'AI request failed')}
 finally{busy=false}
 }
 
