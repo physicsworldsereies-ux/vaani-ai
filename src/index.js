@@ -290,7 +290,7 @@ export default {
         const token=(req.headers.get("authorization")||"").split(" ").slice(1).join(" ");const result=await adminAction(env,user,{action:"admin-data"},token);return json({stats:result.stats,daily_usage:result.daily_usage},200,cors);
       }
       if(path==="/api/admin/users"&&req.method==="GET"){
-        const q=(url.searchParams.get("q")||"").replace(/[,%()]/g,"").slice(0,80),page=Math.max(1,Number(url.searchParams.get("page")||1));
+        const q=(url.searchParams.get("q")||"").replace(/[,%()]/g,"").slice(0,80),page=Math.max(1,Math.min(2000,Number(url.searchParams.get("page")||1)||1));
         const {data}=await sbJson(env,"/rest/v1/profiles?select=id,email,full_name,credits,is_admin,is_banned,created_at&or=(email.ilike.*"+encodeURIComponent(q)+"*,full_name.ilike.*"+encodeURIComponent(q)+"*)&order=created_at.desc&limit=50&offset="+((page-1)*50));
         return json({users:data||[]},200,cors);
       }
