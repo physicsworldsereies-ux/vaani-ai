@@ -214,11 +214,11 @@ async function adminAction(env,user,body,token){
       sbJson(env,"/rest/v1/credit_ledger?select=id,user_id,delta,reason,ref,created_at&order=created_at.desc&limit=1000"),
       sbJson(env,"/rest/v1/messages?select=created_at,credits_used&order=created_at.desc&limit=1000")
     ]);
-    
     const allOrders=orders.data||[],allLedger=ledger.data||[],allMessages=messages.data||[];
     const daily={};
     for(let i=29;i>=0;i--){const day=new Date(Date.now()-i*86400000).toISOString().slice(0,10);daily[day]={date:day,messages:0,credits_used:0,revenue_inr:0};}
     for(const m of allMessages){const day=String(m.created_at||"").slice(0,10);if(daily[day]){daily[day].messages++;daily[day].credits_used+=Number(m.credits_used||0);}}
+    for(const l of allLedger){const day=String(l.created_at||"").slice(0,10);if(daily[day]&&l.reason==="chat"&&Number(l.delta)<0&&!allMessages.some(m=>String(m.created_at||"").slice(0,10)===day))daily[day].credits_used+=-Number(l.delta);}
     for(const o of allOrders){const day=String(o.created_at||"").slice(0,10);if(daily[day]&&o.status==="paid")daily[day].revenue_inr+=Number(o.amount_paise||0)/100;}
     return {stats:stats.data||{},users:users.data||[],orders:allOrders,packs:packs.data||[],settings:settingsRows.data||[],ledger:allLedger,daily_usage:Object.values(daily)};
   }
