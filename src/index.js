@@ -32,7 +32,7 @@ export async function hmac(secret,value){
   return [...new Uint8Array(await crypto.subtle.sign("HMAC",key,enc.encode(value)))].map(x=>x.toString(16).padStart(2,"0")).join("");
 }
 export function calculateCredits(inputTokens,outputTokens,inputRate,outputRate){return Math.max(1,Math.ceil((inputTokens/1000)*inputRate+(outputTokens/1000)*outputRate));}
-async function readBody(req,limit=16_384){
+export async function readBody(req,limit=16_384){
   const declared=Number(req.headers.get("content-length")||0);
   if(declared>limit) throw Object.assign(new Error("body_too_large"),{status:413});
   const text=await req.text();
