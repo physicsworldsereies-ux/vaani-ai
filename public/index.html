@@ -435,6 +435,56 @@ html:not(.mobile-layout) #app{grid-template-columns:280px minmax(0,1fr)}
 #mod .ov:has(.admin-modal){z-index:10000}
 #mod .ov:has(.admin-modal) .admin-modal{min-height:100%}
 
+
+/* Mobile-first application layout: use the same responsive interface on every device. */
+html,body{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
+#land{width:100%;max-width:100%;overflow-x:clip}
+#land .hero{grid-template-columns:minmax(0,1fr)!important;gap:1.5rem!important;padding:clamp(1rem,4vw,2rem)!important}
+#land .hero>*{min-width:0;width:100%;max-width:100%}
+#land .hero h1{font-size:clamp(2rem,7vw,3.4rem)!important;overflow-wrap:anywhere}
+#land .demo{width:100%;min-width:0}
+#land .navr{flex-wrap:wrap;justify-content:flex-end}
+#land section,#land footer{padding-left:clamp(1rem,4vw,2rem)!important;padding-right:clamp(1rem,4vw,2rem)!important}
+#app,#app.full-chat,html #app,html.mobile-layout #app,body.mobile-layout #app{
+ display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+ width:100%!important;max-width:100%!important;height:100dvh!important;height:100svh!important;
+ min-height:0!important;overflow:hidden!important
+}
+#app>main,html #app>main,body #app>main{
+ display:flex!important;flex-direction:column!important;grid-column:1/-1!important;
+ width:100%!important;max-width:100%!important;min-width:0!important;min-height:0!important
+}
+#app>aside,html #app>aside,body #app>aside{
+ position:fixed!important;inset:0 auto 0 0!important;
+ width:min(82vw,300px)!important;max-width:300px!important;height:100dvh!important;height:100svh!important;
+ z-index:1000!important;transform:translateX(-105%);overflow-y:auto!important;overscroll-behavior:contain;
+ padding:calc(.7rem + env(safe-area-inset-top,0px)) .7rem calc(.7rem + env(safe-area-inset-bottom,0px))!important;
+ background:#080808!important;box-shadow:12px 0 40px #0005
+}
+#app>aside.open,html #app>aside.open,body #app>aside.open{transform:translateX(0)!important;display:flex!important}
+#app.full-chat>aside{display:none!important}
+#app .top{width:100%;min-width:0;padding-left:clamp(.7rem,3vw,1.25rem);padding-right:clamp(.7rem,3vw,1.25rem)}
+#app .top .menu{display:grid!important;flex:none}
+#app #msgs{flex:1 1 auto!important;width:100%!important;max-width:100%!important;min-width:0!important;min-height:0!important;overflow-y:auto!important;padding:clamp(.7rem,3vw,1.25rem)!important;overflow-wrap:anywhere}
+#app .comp{width:100%!important;max-width:100%!important;min-width:0!important;padding:.6rem clamp(.6rem,3vw,1rem) calc(.65rem + env(safe-area-inset-bottom,0px))!important}
+#app .box,#app textarea,#app input{width:100%;max-width:100%;min-width:0}
+#app .m{max-width:100%;overflow-wrap:anywhere}
+#app .m.bot .t{font-size:clamp(.98rem,2.5vw,1.05rem);line-height:1.75;overflow-wrap:anywhere}
+#app pre,#app code,#app table{max-width:100%;overflow-x:auto}
+#mod .ov{padding:env(safe-area-inset-top,0px) .65rem env(safe-area-inset-bottom,0px)!important;overflow-y:auto}
+#mod .mod{width:min(100%,720px)!important;max-width:100%!important;max-height:calc(100dvh - 1rem)!important;overflow:auto!important}
+#mod .mod:has(.admin-modal){width:100%!important;max-width:100%!important;max-height:100dvh!important}
+#mod .admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+#mod .admin-form{grid-template-columns:minmax(0,1fr)}
+#mod .admin-form .wide{grid-column:auto}
+#mod input,#mod textarea,#mod select{max-width:100%;min-width:0}
+#mod .admin-table{width:100%;overflow-x:auto}
+@media(max-width:380px){
+ #land .navr .btn{padding:.55rem .7rem;font-size:.88rem}
+ #app #msgs{padding:.6rem!important}
+ #mod .admin-stats{grid-template-columns:minmax(0,1fr)}
+}
+
 </style>
 </head>
 <body>
