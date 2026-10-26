@@ -733,18 +733,24 @@ sb.auth.onAuthStateChange((ev,session)=>{
 
 async function out(){
  closeM();
+ // Switch the visible UI immediately; do not wait for the network sign-out request.
+ const app=$('app'),land=$('land'),loader=$('auth-loader');
+ app.classList.add('hide');
+ land.classList.remove('hide');
+ loader.classList.add('hide');
+ document.documentElement.classList.remove('direct-chat','auth-pending');
+ $('side').classList.remove('open','profile-open');
+ $('profilePanel').innerHTML='';
+ window.scrollTo(0,0);
  try{
   const {error}=await sb.auth.signOut();
   if(error)throw error;
-  user=null;prof=null;chats=[];cur=null;
-  $('side').classList.remove('open','profile-open');
-  $('profilePanel').innerHTML='';
-  $('app').classList.add('hide');
-  $('land').classList.remove('hide');
-  $('auth-loader').classList.add('hide');
-  document.documentElement.classList.remove('direct-chat','auth-pending');
-  window.scrollTo(0,0);
- }catch(e){toast('Sign out failed: '+(e.message||'Please try again'))}
+  user=null;prof=null;chats=[];cur=null;entering=false;chatHandoff=null;
+ }catch(e){
+  // If sign-out fails, restore the signed-in interface instead of leaving a false logged-out screen.
+  if(user){land.classList.add('hide');app.classList.remove('hide');}
+  toast('Sign out failed: '+(e.message||'Please try again'));
+ }
 }
 function buyOpen(){if(!user){authOpen();return}modal(`<h2>Top up credits</h2><p>Secure checkout via Razorpay. Credits are added only after server-side signature verification.</p>`+PACKS.map(k=>`<div class="row"><span><b>${k.c}</b> credits</span><button class="btn ${k.b?'pri':'ghost'}" style="padding:.4rem .9rem" onclick="buy(${Number(k.id)})">₹${Number(k.p).toFixed(2)}</button></div>`).join('')+`<button class="btn ghost" style="width:100%;margin-top:1rem" onclick="closeM()">Close</button>`)}
 async function buy(packId){try{if(!window.Razorpay)throw new Error('Razorpay Checkout failed to load.');const order=await api('create-order',{pack_id:packId});closeM();const checkout=new Razorpay({key:order.key_id,amount:order.amount,currency:order.currency,name:order.name,description:order.description,order_id:order.order_id,prefill:order.prefill,theme:{color:'#ffb547'},handler:async function(response){try{const result=await api('verify-payment',response);const {data}=await sb.from('profiles').select('*').eq('id',user.id).single();if(data)prof=data;$('cr').textContent=prof.credits;toast('Payment verified. Credits updated.');}catch(e){toast('Payment submitted but verification needs attention: '+e.message)}} ,modal:{ondismiss:function(){toast('Checkout closed. If payment succeeded, credits update after verification.')}}});checkout.open()}catch(e){toast(e.message||'Could not start payment')}}
