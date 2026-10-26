@@ -23,14 +23,15 @@ async function sbJson(env,path,init={}) {
   if(!res.ok) throw new Error("supabase_"+res.status);
   return {data,res};
 }
-function constantEqual(a,b){
+export function constantEqual(a,b){
   if(typeof a!=="string"||typeof b!=="string"||a.length!==b.length)return false;
   let n=0; for(let i=0;i<a.length;i++)n|=a.charCodeAt(i)^b.charCodeAt(i); return n===0;
 }
-async function hmac(secret,value){
+export async function hmac(secret,value){
   const key=await crypto.subtle.importKey("raw",enc.encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
   return [...new Uint8Array(await crypto.subtle.sign("HMAC",key,enc.encode(value)))].map(x=>x.toString(16).padStart(2,"0")).join("");
 }
+export function calculateCredits(inputTokens,outputTokens,inputRate,outputRate){return Math.max(1,Math.ceil((inputTokens/1000)*inputRate+(outputTokens/1000)*outputRate));}
 async function readBody(req,limit=16_384){
   const declared=Number(req.headers.get("content-length")||0);
   if(declared>limit) throw Object.assign(new Error("body_too_large"),{status:413});
@@ -186,7 +187,7 @@ async function chat(req,env,ctx,cors,user,token){
       if(!full)throw new Error("empty_reply");
       const tin=Number(usage?.promptTokenCount||Math.ceil((text.length+history.reduce((n,m)=>n+m.content.length,0))/4));
       const tout=Number(usage?.candidatesTokenCount||Math.ceil(full.length/4));
-      const cost=Math.max(1,Math.ceil(tin/1000*rin+tout/1000*rout));
+      const cost=calculateCredits(tin,tout,rin,rout);
       const latest=await profile(env,user.id);
       if(!latest||latest.is_banned||latest.credits<cost){
         await sendEvent({type:"error",error:latest?.is_banned?"banned":"no_credits"});return;
