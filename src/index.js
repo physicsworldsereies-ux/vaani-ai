@@ -248,6 +248,13 @@ async function adminAction(env,user,body){
     if(Number.isInteger(body.price_paise)&&body.price_paise>0)update.price_paise=body.price_paise;
     if(typeof body.active==="boolean")update.active=body.active;
     if(typeof body.is_popular==="boolean")update.is_popular=body.is_popular;
+    if(!body.id){
+      if(!update.name||!Number.isInteger(update.credits)||!Number.isInteger(update.price_paise))throw Object.assign(new Error("invalid_pack"),{status:400});
+      if(typeof update.active!=="boolean")update.active=true;
+      if(typeof update.is_popular!=="boolean")update.is_popular=false;
+      const result=await sbJson(env,"/rest/v1/credit_packs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify(update)});
+      return {saved:true,pack:Array.isArray(result.data)?result.data[0]:null};
+    }
     if(!Number.isInteger(id)||id<1||!Object.keys(update).length)throw Object.assign(new Error("invalid_pack"),{status:400});
     await sbJson(env,"/rest/v1/credit_packs?id=eq."+id,{method:"PATCH",body:JSON.stringify(update)});return {saved:true};
   }
