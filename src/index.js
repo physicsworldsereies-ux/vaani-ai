@@ -208,7 +208,7 @@ async function adminAction(env,user,body){
   const action=String(body.action||"");
   if(action==="admin-data"){
     const [stats,users,orders,packs,settingsRows,ledger,messages]=await Promise.all([
-      sbJson(env,"/rest/v1/profiles?select=id",{headers:{prefer:"count=exact"}}),
+      fetch(env.SUPABASE_URL+"/rest/v1/rpc/admin_stats",{method:"POST",headers:{apikey:"sb_publishable__GL22Bcvbk0VC-uhhrsQ1Q_9edvV9OD",authorization:"Bearer "+token,"content-type":"application/json"},body:"{}"}).then(async r=>{if(!r.ok)throw new Error("admin_stats_failed");return {data:await r.json(),res:r}}),
       sbJson(env,"/rest/v1/profiles?select=id,email,full_name,credits,is_admin,is_banned,created_at&order=created_at.desc&limit=200"),
       sbJson(env,"/rest/v1/orders?select=id,user_id,pack_id,razorpay_order_id,razorpay_payment_id,amount_paise,credits,status,created_at&order=created_at.desc&limit=200"),
       sbJson(env,"/rest/v1/credit_packs?select=id,name,credits,price_paise,is_popular,active,sort&order=sort"),
@@ -216,9 +216,9 @@ async function adminAction(env,user,body){
       sbJson(env,"/rest/v1/credit_ledger?select=id,user_id,delta,reason,ref,created_at&order=created_at.desc&limit=1000"),
       sbJson(env,"/rest/v1/messages?select=created_at,credits_used&order=created_at.desc&limit=1000")
     ]);
-    const count=Number((stats.res.headers.get("content-range")||"*/0").split("/").pop())||0;
+    
     const allOrders=orders.data||[],allLedger=ledger.data||[],allMessages=messages.data||[];\n    const daily={};\n    for(let i=29;i>=0;i--){const day=new Date(Date.now()-i*86400000).toISOString().slice(0,10);daily[day]={date:day,messages:0,credits_used:0,revenue_inr:0};}\n    for(const m of allMessages){const day=String(m.created_at||"").slice(0,10);if(daily[day]){daily[day].messages++;daily[day].credits_used+=Number(m.credits_used||0);}}\n    for(const o of allOrders){const day=String(o.created_at||"").slice(0,10);if(daily[day]&&o.status==="paid")daily[day].revenue_inr+=Number(o.amount_paise||0)/100;}
-    return {stats:{users:count,banned:(users.data||[]).filter(x=>x.is_banned).length,revenue_inr:allOrders.filter(x=>x.status==="paid").reduce((n,x)=>n+Number(x.amount_paise||0),0)/100,credits_used:-allLedger.filter(x=>x.reason==="chat").reduce((n,x)=>n+Number(x.delta||0),0),messages:allMessages.length},users:users.data||[],orders:allOrders,packs:packs.data||[],settings:settingsRows.data||[],ledger:allLedger,daily_usage:Object.values(daily)};
+    return {stats:stats.data||{},users:users.data||[],orders:allOrders,packs:packs.data||[],settings:settingsRows.data||[],ledger:allLedger,daily_usage:Object.values(daily)};
   }
   if(action==="admin-user"){
     const id=String(body.user_id||"");if(!UUID.test(id))throw Object.assign(new Error("invalid_user"),{status:400});
@@ -228,7 +228,7 @@ async function adminAction(env,user,body){
   }
   if(action==="admin-credit"){
     const id=String(body.user_id||""),amount=Math.floor(Number(body.amount));
-    if(!UUID.test(id)||!Number.isInteger(amount)||amount<1||amount>100000)throw Object.assign(new Error("invalid_credit_amount"),{status:400});
+    if(!UUID.test(id)||!Number.isInteger(amount)||amount===0||Math.abs(amount)>100000)throw Object.assign(new Error("invalid_credit_amount"),{status:400});
     const {data}=await sbJson(env,"/rest/v1/rpc/admin_adjust_credits",{method:"POST",body:JSON.stringify({p_user:id,p_delta:amount,p_reason:String(body.reason||"admin_adjust").slice(0,120)})});return {saved:true,credits:data};
   }
   if(action==="admin-setting"){
@@ -278,7 +278,7 @@ export default {
       const p=await requireAdmin(env,user);
       if(path==="/api/admin/me"&&req.method==="GET")return json({is_admin:true,user_id:user.id},200,cors);
       if(path==="/api/admin/stats"&&req.method==="GET"){
-        const result=await adminAction(env,user,{action:"admin-data"});return json({stats:result.stats},200,cors);
+        const token=(req.headers.get("authorization")||"").split(" ").slice(1).join(" ");const result=await adminAction(env,user,{action:"admin-data"},token);return json({stats:result.stats,daily_usage:result.daily_usage},200,cors);
       }
       if(path==="/api/admin/users"&&req.method==="GET"){
         const q=(url.searchParams.get("q")||"").replace(/[,%()]/g,"").slice(0,80),page=Math.max(1,Number(url.searchParams.get("page")||1));
