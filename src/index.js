@@ -224,9 +224,9 @@ async function adminAction(env,user,body,token){
   }
   if(action==="admin-user"){
     const id=String(body.user_id||"");if(!UUID.test(id))throw Object.assign(new Error("invalid_user"),{status:400});
-    const update={};if(typeof body.is_banned==="boolean")update.is_banned=body.is_banned;if(typeof body.is_admin==="boolean")update.is_admin=body.is_admin;
-    if(!Object.keys(update).length)throw Object.assign(new Error("invalid_update"),{status:400});
-    await sbJson(env,"/rest/v1/profiles?id=eq."+id,{method:"PATCH",body:JSON.stringify(update)});return {saved:true};
+    if(typeof body.is_banned==="boolean"){await sbJson(env,"/rest/v1/profiles?id=eq."+id,{method:"PATCH",body:JSON.stringify({is_banned:body.is_banned})});return {saved:true};}
+    if(typeof body.is_admin==="boolean")throw Object.assign(new Error("admin_role_change_disabled_use_owner_console"),{status:403});
+    throw Object.assign(new Error("invalid_update"),{status:400});
   }
   if(action==="admin-credit"){
     const id=String(body.user_id||""),amount=Math.floor(Number(body.amount));
