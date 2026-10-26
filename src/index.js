@@ -324,6 +324,26 @@ export default {
   if(path.startsWith("/api/"))return json({error:"not_found"},404,cors);
   if(req.method!=="GET"&&req.method!=="HEAD")return json({error:"method_not_allowed"},405,cors);
   if(!env.ASSETS)return json({error:"assets_not_configured"},503,cors);
+  if((path==="/admin"||path==="/admin/")&&req.method==="GET"){
+    const assetUrl=new URL("/",req.url);
+    const assetResponse=await env.ASSETS.fetch(new Request(assetUrl.toString(),req));
+    if(!assetResponse.ok)return assetResponse;
+    const html=await assetResponse.text();
+    const bootstrap=`<script>
+      window.addEventListener("load",async function(){
+        try{
+          const result=await sb.auth.getSession();
+          if(!result.data.session){authOpen();return;}
+          await enter(result.data.session);
+          if(prof&&prof.is_admin){await adminOpen();}
+          else{history.replaceState({}, "", "/");toast("Admin access required.");}
+        }catch(e){history.replaceState({}, "", "/");toast("Could not open admin panel.");}
+      });
+    </script>`;
+    const headers=new Headers(assetResponse.headers);
+    headers.delete("content-length");headers.delete("content-encoding");headers.delete("etag");
+    return new Response(html.replace("</body>",bootstrap+"</body>"),{status:assetResponse.status,headers});
+  }
   return env.ASSETS.fetch(req);
  }
 };
