@@ -136,9 +136,12 @@ async function handleWebhook(req,env){
 }
 async function chat(req,env,ctx,cors,user,token){
   if(limited("chat:"+user.id))return json({error:"rate_limited"},429,cors);
-  let body;try{body=JSON.parse(await readBody(req))}catch(e){return json({error:e.status===413?"body_too_large":"bad_request"},e.status||400,cors)}
+  let body;try{body=JSON.parse(await readBody(req,4_000_000))}catch(e){return json({error:e.status===413?"body_too_large":"bad_request"},e.status||400,cors)}
   const text=String(body.message||"").trim();
-  if(!text||text.length>8000)return json({error:"bad_message"},400,cors);
+  const images=Array.isArray(body.images)?body.images:[];
+  if(images.length>3||(!text&&!images.length)||text.length>8000)return json({error:"bad_message"},400,cors);
+  let imageBytes=0;
+  for(const im of images){if(!im||!['image/jpeg','image/png','image/webp'].includes(im.mime_type)||typeof im.data!=='string'||!/^[A-Za-z0-9+/]+={0,2}$/.test(im.data))return json({error:'invalid_image'},400,cors);imageBytes+=im.data.length;if(imageBytes>3_500_000)return json({error:'images_too_large'},413,cors)}
   const p=await profile(env,user.id);
   if(!p)return json({error:"no_profile"},403,cors);
   if(p.is_banned)return json({error:"banned"},403,cors);
@@ -156,7 +159,8 @@ async function chat(req,env,ctx,cors,user,token){
     const {data:h}=await sbJson(env,"/rest/v1/messages?chat_id=eq."+chatId+"&user_id=eq."+user.id+"&select=role,content&order=created_at.desc&limit=20");
     history=(Array.isArray(h)?h:[]).reverse();
   }
-  const contents=[...history.map(m=>({role:m.role==="user"?"user":"model",parts:[{text:m.content}]})),{role:"user",parts:[{text}]}];
+  const userParts=[{text:text||'Please describe and help me with the attached image.'},...images.map(im=>({inline_data:{mime_type:im.mime_type,data:im.data}}))];
+  const contents=[...history.map(m=>({role:m.role==="user"?"user":"model",parts:[{text:m.content}]})),{role:"user",parts:userParts}];
   const rin=Math.max(0,Number(S.credits_per_1k_input??1)),rout=Math.max(0,Number(S.credits_per_1k_output??4));
   const maxOut=Math.max(64,Math.min(2048,Math.floor((p.credits/Math.max(rout,1))*1000)));
   const gr=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":streamGenerateContent?alt=sse",{method:"POST",headers:{"content-type":"application/json","x-goog-api-key":env.GEMINI_API_KEY},body:JSON.stringify({systemInstruction:{parts:[{text:String(S.system_prompt??"")} ]},contents,generationConfig:{maxOutputTokens:maxOut}})});
@@ -193,7 +197,7 @@ async function chat(req,env,ctx,cors,user,token){
         await sendEvent({type:"error",error:latest?.is_banned?"banned":"no_credits"});return;
       }
       const deducted=await sbJson(env,"/rest/v1/rpc/save_chat_and_deduct",{method:"POST",body:JSON.stringify({
-        p_user:user.id,p_chat:chatId,p_message:text,p_answer:full,p_tokens_in:tin,p_tokens_out:tout,p_credits:cost
+        p_user:user.id,p_chat:chatId,p_message:text||'[Image attached]',p_answer:full,p_tokens_in:tin,p_tokens_out:tout,p_credits:cost
       })});
       await sendEvent({type:"done",credits_left:deducted.data,credits_used:cost});
     }catch(e){try{await sendEvent({type:"error",error:"ai_error"})}catch{}}
