@@ -676,6 +676,8 @@ async function enter(session){
 let chatHandoff=null;
 async function showChatForSession(session){
   syncResponsiveLayout();
+  const sidebar=$('side');
+  if(sidebar){sidebar.style.setProperty('visibility','visible','important');sidebar.style.setProperty('pointer-events','auto','important');}
   if(chatHandoff)return chatHandoff;
   chatHandoff=(async()=>{
     document.documentElement.classList.add('direct-chat');
@@ -704,6 +706,9 @@ sb.auth.onAuthStateChange((ev,session)=>{
     document.documentElement.classList.remove('direct-chat','auth-pending');
     user=null;prof=null;chats=[];cur=null;entering=false;chatHandoff=null;
     $('side').classList.remove('open','profile-open');
+    $('side').style.setProperty('transform','translateX(-105%)','important');
+    $('side').style.setProperty('visibility','hidden','important');
+    $('side').style.setProperty('pointer-events','none','important');
     $('profilePanel').innerHTML='';
     $('app').classList.add('hide');
     $('land').classList.remove('hide');
@@ -739,7 +744,11 @@ async function out(){
  land.classList.remove('hide');
  loader.classList.add('hide');
  document.documentElement.classList.remove('direct-chat','auth-pending');
- $('side').classList.remove('open','profile-open');
+ const side=$('side');
+ side.classList.remove('open','profile-open');
+ side.style.setProperty('transform','translateX(-105%)','important');
+ side.style.setProperty('visibility','hidden','important');
+ side.style.setProperty('pointer-events','none','important');
  $('profilePanel').innerHTML='';
  window.scrollTo(0,0);
  try{
