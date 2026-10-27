@@ -534,7 +534,7 @@ html,body{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
 <div class="hist" id="hist"></div>
 <div class="cred"><div><span class="small">Credits left</span><br><b id="cr">50</b></div><button class="btn pri" style="padding:.5rem .9rem" onclick="buyOpen()">Top up</button></div>
 <button class="me" onclick="profOpen()"><span class="av" id="av">D</span><span><b id="nm">Demo User</b><br><span class="small">Profile</span></span></button><section id="profilePanel" aria-label="Account profile"></section></aside>
-<main><div class="top"><button type="button" class="ic menu" onclick="toggleSidebar()" aria-controls="side" aria-expanded="false" aria-label="Open sidebar">☰</button><b id="ct">New chat</b></div>
+<main><div class="top"><button type="button" class="ic menu" onclick="toggleSidebar()" aria-controls="side" aria-expanded="false" aria-label="Open sidebar">☰</button><b id="ct">New chat</b><button type="button" class="ic expand-chat" id="expandChatBtn" onclick="toggleFullChat()" title="Full chat screen" aria-label="Expand chat" aria-pressed="false">⛶</button></div>
 <div id="msgs"><div class="col" id="col"></div></div>
 <div class="comp"><div id="imagePreview" class="image-preview"></div><div class="box"><div class="attach-tools"><button class="ic" aria-label="Choose image from gallery" title="Gallery" onclick="$('galleryInput').click()">▧</button><button class="ic" aria-label="Take a photo" title="Camera" onclick="$('cameraInput').click()">📷</button></div><input id="galleryInput" type="file" accept="image/*" multiple hidden onchange="pickImages(this)"><input id="cameraInput" type="file" accept="image/*" capture="environment" hidden onchange="pickImages(this)">
 <textarea id="in" rows="1" placeholder="Message Vaani or add an image"></textarea><button class="ic send" id="sb" aria-label="Send">➤</button></div>
@@ -775,14 +775,34 @@ function toggleFullChat(){
  const app=$('app'),side=$('side'),btn=$('expandChatBtn');
  const full=app.classList.toggle('full-chat');
  side.classList.remove('open');
+ side.style.setProperty('transform','translateX(-105%)','important');
+ side.style.setProperty('visibility','visible','important');
+ side.style.setProperty('pointer-events','auto','important');
  btn.textContent=full?'⤢':'⛶';
  btn.title=full?'Show sidebar':'Full chat screen';
  btn.setAttribute('aria-label',full?'Show sidebar':'Expand chat');
+ btn.setAttribute('aria-pressed',String(full));
 }
 function newChat(){const app=$('app'),side=$('side');app.classList.remove('full-chat');profileClose();cur={id:null,t:'New chat',m:[]};$('in').value='';pendingImages=[];showImagePreview();draw();side.classList.remove('open');side.style.removeProperty('transform');side.style.removeProperty('visibility');side.style.removeProperty('pointer-events');const menu=document.querySelector('#app .top .menu');if(menu){menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open sidebar')}}
-async function open_(id){cur=chats.find(c=>c.id===id);
-if(cur.m===null){const r=await sb.from('messages').select('role,content').eq('chat_id',id).order('created_at');cur.m=(r.data||[]).map(x=>({r:x.role==='user'?'u':'b',x:x.content}))}
-draw();$('side').classList.remove('open')}
+async function open_(id){
+ const selected=chats.find(c=>c.id===id);if(!selected)return;
+ cur=selected;
+ try{
+  if(cur.m===null){
+   const r=await sb.from('messages').select('role,content').eq('chat_id',id).order('created_at');
+   if(r.error)throw r.error;
+   cur.m=(r.data||[]).map(x=>({r:x.role==='user'?'u':'b',x:x.content}));
+  }
+  draw();
+  $('app').classList.add('full-chat');
+  $('side').classList.remove('open','profile-open');
+  $('side').style.setProperty('transform','translateX(-105%)','important');
+  $('side').style.setProperty('visibility','visible','important');
+  $('side').style.setProperty('pointer-events','auto','important');
+  const btn=$('expandChatBtn');if(btn){btn.textContent='⤢';btn.title='Show sidebar';btn.setAttribute('aria-label','Show sidebar');btn.setAttribute('aria-pressed','true')}
+  const menu=document.querySelector('#app .top .menu');if(menu){menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open sidebar')}
+ }catch(e){toast('Could not open this chat: '+(e.message||'Please retry'))}
+}
 function draw(){
  $('hist').innerHTML='<small>History</small>'+chats.map(c=>`<div class="hist-row ${cur&&c.id===cur.id?'active':''}"><button class="hist-open" title="${esc(c.t)}" onclick="open_('${c.id}')">${esc(c.t)}</button><button class="hist-delete" title="Delete chat" aria-label="Delete chat: ${esc(c.t)}" onclick="deleteChat('${c.id}',event)">×</button></div>`).join('');
  $('ct').textContent=cur.t;
