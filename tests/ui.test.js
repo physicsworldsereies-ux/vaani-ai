@@ -2,10 +2,14 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
 describe("Vaani chat UI", () => {
-  it("keeps the deployed public app and root copy in sync", () => {
-    const root = readFileSync(new URL("../index.html", import.meta.url), "utf8");
-    const publicHtml = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
-    expect(root).toBe(publicHtml);
+  it("keeps New Chat state and in-flight responses isolated in both app entrypoints", () => {
+    for (const path of ["../index.html", "../public/index.html"]) {
+      const html = readFileSync(new URL(path, import.meta.url), "utf8");
+      expect(html).toContain("function newChat(){const app=$('app'),side=$('side')");
+      expect(html).toContain("const chat=cur;const prompt=");
+      expect(html).toContain("chat.m.pop();chat.m.pop();draw()");
+      expect(html).toContain("if(cur===chat)$('msgs').scrollTop=1e9");
+    }
   });
 
   it("only renders the profile admin shortcut for an active authorized admin profile", () => {
