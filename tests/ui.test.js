@@ -18,6 +18,23 @@ describe("Vaani chat UI", () => {
     }
   });
 
+  it("exits full-chat mode before toggling a hidden sidebar and restores menu state", () => {
+    for (const path of ["../index.html", "../public/index.html"]) {
+      const html = readFileSync(new URL(path, import.meta.url), "utf8");
+      const start = html.indexOf("function toggleSidebar()");
+      const end = html.indexOf("function syncResponsiveLayout()", start);
+      expect(start).toBeGreaterThanOrEqual(0);
+      expect(end).toBeGreaterThan(start);
+      const toggle = html.slice(start, end);
+      expect(toggle).toContain("app.classList.remove('full-chat')");
+      expect(toggle.indexOf("app.classList.remove('full-chat')")).toBeLessThan(toggle.indexOf("const opening="));
+      expect(toggle).toContain("side.style.setProperty('visibility','visible','important')");
+      expect(toggle).toContain("side.style.setProperty('pointer-events','auto','important')");
+      expect(toggle).toContain("aria-expanded");
+      expect(toggle).toContain("aria-pressed");
+    }
+  });
+
   it("only renders the profile admin shortcut for an active authorized admin profile", () => {
     const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
     expect(html).toContain("prof&&prof.is_admin===true&&!prof.is_banned");
