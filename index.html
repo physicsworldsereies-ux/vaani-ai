@@ -597,12 +597,27 @@ async function loadPacks(){try{const {data,error}=await sb.from('credit_packs').
 loadPacks();
 function authOpen(){modal(`<h2>Welcome to Vaani</h2><p>Sign in to get free credits and save your chats.</p><button class="g" onclick="signIn()"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>Continue with Google</button><p class="small" style="margin:1rem 0 0">By continuing you agree to the Terms and Privacy Policy.</p>`)}
 async function signIn(){try{const {data:{session}}=await sb.auth.getSession();if(session){await enter(session);return}const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});if(error)toast('Login failed: '+error.message)}catch(e){toast('Login failed: '+(e.message||'Please try again'))}}
-function toggleSidebar(){
- const side=$('side'),btn=document.querySelector('#app .top .menu');
- if(!side)return;
- const opening=!side.classList.contains('open');
+function toggleSidebar(event){
+ const app=$('app'),side=$('side'),btn=document.querySelector('#app .top .menu');
+ if(event){event.preventDefault();event.stopPropagation()}
+ if(!app||!side)return;
+ // History selection intentionally enters full-chat mode. When leaving that mode,
+ // always open the sidebar; do not let a stale .open class turn this into a no-op.
+ const wasFullChat=app.classList.contains('full-chat');
+ app.classList.remove('full-chat');
+ const opening=wasFullChat||!side.classList.contains('open');
  side.classList.toggle('open',opening);
  side.style.setProperty('transform',opening?'translateX(0)':'translateX(-105%)','important');
+ side.style.setProperty('visibility','visible','important');
+ side.style.setProperty('pointer-events','auto','important');
+ side.style.setProperty('z-index','1000','important');
+ const expand=$('expandChatBtn');
+ if(expand){
+  expand.textContent='⛶';
+  expand.title='Full chat screen';
+  expand.setAttribute('aria-label','Expand chat');
+  expand.setAttribute('aria-pressed','false');
+ }
  if(btn){btn.setAttribute('aria-expanded',String(opening));btn.setAttribute('aria-label',opening?'Close sidebar':'Open sidebar');}
 }
 function syncResponsiveLayout(){

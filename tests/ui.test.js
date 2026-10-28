@@ -18,6 +18,25 @@ describe("Vaani chat UI", () => {
     }
   });
 
+  it("always opens the sidebar when leaving history full-chat mode, even with stale open state", () => {
+    for (const path of ["../index.html", "../public/index.html"]) {
+      const html = readFileSync(new URL(path, import.meta.url), "utf8");
+      const start = html.indexOf("function toggleSidebar(event)");
+      const end = html.indexOf("function syncResponsiveLayout()", start);
+      expect(start).toBeGreaterThanOrEqual(0);
+      expect(end).toBeGreaterThan(start);
+      const toggle = html.slice(start, end);
+      expect(toggle).toContain("const wasFullChat=app.classList.contains('full-chat')");
+      expect(toggle).toContain("const opening=wasFullChat||!side.classList.contains('open')");
+      expect(toggle.indexOf("app.classList.remove('full-chat')")).toBeLessThan(toggle.indexOf("const opening="));
+      expect(toggle).toContain("side.style.setProperty('visibility','visible','important')");
+      expect(toggle).toContain("side.style.setProperty('pointer-events','auto','important')");
+      expect(toggle).toContain("side.style.setProperty('z-index','1000','important')");
+      expect(toggle).toContain("aria-expanded");
+      expect(toggle).toContain("aria-pressed");
+    }
+  });
+
   it("only renders the profile admin shortcut for an active authorized admin profile", () => {
     const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
     expect(html).toContain("prof&&prof.is_admin===true&&!prof.is_banned");
