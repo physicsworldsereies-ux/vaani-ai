@@ -2,6 +2,12 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
 describe("Vaani chat UI", () => {
+  it("keeps the root compatibility entrypoint byte-for-byte aligned with the deployed public frontend", () => {
+    const root = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    const deployed = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+    expect(root).toBe(deployed);
+  });
+
   it("keeps New Chat state and in-flight responses isolated in both app entrypoints", () => {
     for (const path of ["../index.html", "../public/index.html"]) {
       const html = readFileSync(new URL(path, import.meta.url), "utf8");
