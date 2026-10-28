@@ -2,6 +2,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const WINDOW_MS = 60_000;
 const RATE_MAX = 12;
 const rateBuckets = new Map();
+let rateSweepCounter = 0;
 
 const json = (data, status=200, headers={}) => new Response(JSON.stringify(data), {
   status, headers: { "content-type":"application/json; charset=utf-8", "cache-control":"no-store", ...headers }
@@ -52,7 +53,17 @@ function corsFor(req,env){
   };
 }
 function limited(key){
-  const now=Date.now(); const old=rateBuckets.get(key);
+  const now=Date.now();
+  // Worker isolates are ephemeral, so this is best-effort per-isolate protection.
+  // Periodically remove expired keys to prevent the Map growing forever under unique-user traffic.
+  if((++rateSweepCounter & 255)===0){
+    for(const [bucketKey,bucket] of rateBuckets){
+      if(now-bucket.start>=WINDOW_MS)rateBuckets.delete(bucketKey);
+    }
+    // Bound worst-case memory if an isolate receives many distinct user IDs in one window.
+    while(rateBuckets.size>50_000)rateBuckets.delete(rateBuckets.keys().next().value);
+  }
+  const old=rateBuckets.get(key);
   if(!old||now-old.start>=WINDOW_MS){rateBuckets.set(key,{start:now,count:1});return false}
   old.count++; return old.count>RATE_MAX;
 }
