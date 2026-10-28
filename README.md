@@ -2,12 +2,20 @@
 
 The existing `vaani-ai` Worker serves both the static site and API from one origin. The current production deployment is not changed by these repository edits; review and deploy manually when ready.
 
+## Source-of-truth and deployment boundaries
+
+- **Deployed frontend source of truth:** `public/index.html`. The root `index.html` is kept byte-for-byte synchronized for compatibility and regression tests; update both together (the UI test enforces this).
+- **Deployed API source of truth:** `src/index.js`, selected by `wrangler.toml` as the Worker entrypoint.
+- `vaani-site/index.html` and `supabase/functions/vaani-api/index.ts` are legacy/alternate implementations, not automatically deployed by this Worker's `wrangler.toml`. Do not edit/deploy them as though they were the active production path without explicitly migrating and verifying that deployment.
+- The Worker in-memory chat limiter is per-isolate best effort only. Production protection still requires a Cloudflare rate-limiting rule or a shared, durable limiter.
+
 ## Files
 - `public/index.html`: Supabase Google sign-in, profile, credits, saved chat history and DB credit packs.
 - `public/assets/stars.webp`: star texture.
 - `src/index.js`: `POST /api/chat` SSE stream, Razorpay order/webhook/verify, admin API and static-site routing.
 - `wrangler.toml`: Worker configuration for `vaani-ai`.
 - `supabase/migrations/20261026_worker_hardening.sql`: make chat persistence + credit deduction transactional and fail-closed. Review against live schema and apply manually before real usage.
+- `supabase/migrations/20261028_audit_security_hardening.sql`: revoke anonymous execution of `is_admin()` and prevent duplicate non-null Razorpay payment IDs. Review and apply through the approved migration workflow.
 - `public/privacy.html`, `public/terms.html`, `public/refund.html`, `public/contact.html`: legal drafts with explicit owner TODOs.
 
 ## Local run
