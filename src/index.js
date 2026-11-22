@@ -266,6 +266,24 @@ async function adminAction(env,user,body,token){
     if(!UUID.test(id)||!Number.isInteger(amount)||amount===0||Math.abs(amount)>100000)throw Object.assign(new Error("invalid_credit_amount"),{status:400});
     const {data}=await sbJson(env,"/rest/v1/rpc/admin_adjust_credits",{method:"POST",body:JSON.stringify({p_user:id,p_delta:amount,p_reason:String(body.reason||"admin_adjust").slice(0,120)})});return {saved:true,credits:data};
   }
+  if(action==="admin-settings-batch"){
+    if(!Array.isArray(body.values)||body.values.length<1||body.values.length>6)throw Object.assign(new Error("invalid_settings_batch"),{status:400});
+    const allowed=new Set(["system_prompt","model","free_credits","credits_per_1k_input","credits_per_1k_output","maintenance_mode"]);
+    const seen=new Set();
+    const rows=body.values.map(item=>{
+      const key=String(item?.key||"");
+      if(!allowed.has(key)||seen.has(key))throw Object.assign(new Error("setting_not_allowed"),{status:400});
+      seen.add(key);
+      let value=item.value;
+      if(key==="maintenance_mode")value=Boolean(value);
+      else if(key==="system_prompt")value=String(value||"").slice(0,12000);
+      else if(key==="model"){value=String(value||"").trim();if(!/^[a-zA-Z0-9._-]{1,100}$/.test(value))throw Object.assign(new Error("invalid_model"),{status:400})}
+      else {value=Number(value);if(!Number.isFinite(value)||value<0||value>100000)throw Object.assign(new Error("invalid_setting"),{status:400});}
+      return {key,value,updated_at:new Date().toISOString()};
+    });
+    await sbJson(env,"/rest/v1/app_settings?on_conflict=key",{method:"POST",headers:{prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(rows)});
+    return {saved:true,count:rows.length};
+  }
   if(action==="admin-setting"){
     const key=String(body.key||""),allowed=new Set(["system_prompt","model","free_credits","credits_per_1k_input","credits_per_1k_output","maintenance_mode"]);
     if(!allowed.has(key))throw Object.assign(new Error("setting_not_allowed"),{status:400});
@@ -377,8 +395,11 @@ export default {
           const result=await sb.auth.getSession();
           if(!result.data.session){authOpen();return;}
           await enter(result.data.session);
-          if(prof&&prof.is_admin){await adminOpen();}
-          else{history.replaceState({}, "", "/");toast("Admin access required.");}
+          if(prof&&prof.is_admin){
+            $("app").classList.add("hide");
+            $("land").classList.add("hide");
+            await adminOpen();
+          }else{history.replaceState({}, "", "/");toast("Admin access required.");}
         }catch(e){history.replaceState({}, "", "/");toast("Could not open admin panel.");}
       });
     </script>`;
