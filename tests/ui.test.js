@@ -89,4 +89,35 @@ describe("Vaani chat UI", () => {
     expect(css).toContain("overflow-wrap:anywhere");
   });
 
+
+  it("builds profile and ordinary modals with valid independent classes", () => {
+    const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+    expect(html).toContain("const isProfile=String(h).includes('<h2>Your profile</h2>')");
+    expect(html).toContain("(isProfile?'profile-overlay':'')");
+    expect(html).toContain("(isProfile?'profile-view':'')");
+    expect(html).not.toContain("${'\u0024{isProfile?");
+  });
+
+  it("routes admin dashboard shortcuts to the standalone /admin route", () => {
+    const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+    expect(html).toContain('id="adminBtn" onclick="location.assign(\'/admin\')"');
+    expect(html).toContain("location.assign('/admin')");
+    expect(html).not.toContain("adminUser('${u.id}','is_admin'");
+  });
+
+  it("prevents stale history fetches from replacing a newer conversation selection", () => {
+    const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+    expect(html).toContain("if(cur!==selected)return;");
+    expect(html).toContain("selected.m=(r.data||[]).map");
+  });
+
+  it("saves all admin settings in a single validated request", () => {
+    const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+    const worker = readFileSync(new URL("../src/index.js", import.meta.url), "utf8");
+    expect(html).toContain("api('admin-settings-batch',{values})");
+    expect(worker).toContain('if(action==="admin-settings-batch")');
+    expect(worker).toContain('resolution=merge-duplicates,return=minimal');
+    expect(worker).toContain("setting_not_allowed");
+  });
+
 });
