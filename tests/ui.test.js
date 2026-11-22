@@ -12,9 +12,9 @@ describe("Vaani chat UI", () => {
     for (const path of ["../index.html", "../public/index.html"]) {
       const html = readFileSync(new URL(path, import.meta.url), "utf8");
       expect(html).toContain("function newChat(){const app=$('app'),side=$('side')");
-      expect(html).toContain("const chat=cur;const prompt=");
-      expect(html).toContain("chat.m.pop();chat.m.pop();draw()");
-      expect(html).toContain("if(cur===chat)$('msgs').scrollTop=1e9");
+      expect(html).toContain("const chat=cur;if(!chat)return;");
+      expect(html).toContain("const answerIndex=chat.m.indexOf(b)");
+      expect(html).toContain("if(cur===chat&&te.isConnected)");
     }
   });
 
@@ -29,12 +29,20 @@ describe("Vaani chat UI", () => {
       expect(toggle).toContain("const wasFullChat=app.classList.contains('full-chat')");
       expect(toggle).toContain("const opening=wasFullChat||!side.classList.contains('open')");
       expect(toggle.indexOf("app.classList.remove('full-chat')")).toBeLessThan(toggle.indexOf("const opening="));
-      expect(toggle).toContain("side.style.setProperty('visibility','visible','important')");
-      expect(toggle).toContain("side.style.setProperty('pointer-events','auto','important')");
-      expect(toggle).toContain("side.style.setProperty('z-index','1000','important')");
+      expect(toggle).toContain("app.classList.toggle('sidebar-open',opening)");
+      expect(toggle).not.toContain("style.setProperty('transform'");
       expect(toggle).toContain("aria-expanded");
       expect(toggle).toContain("aria-pressed");
     }
+  });
+
+  it("keeps desktop sidebar persistent and uses a backdrop drawer on mobile", () => {
+    const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+    expect(html).toContain("grid-template-columns:280px minmax(0,1fr)");
+    expect(html).toContain("#app.sidebar-open .sidebar-scrim");
+    expect(html).toContain("transform:translateX(-105%)!important");
+    expect(html).toContain("function syncResponsiveLayout(){");
+    expect(html).not.toContain("app.style.setProperty('grid-template-columns'");
   });
 
   it("only renders the profile admin shortcut for an active authorized admin profile", () => {
