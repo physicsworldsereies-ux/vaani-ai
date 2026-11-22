@@ -712,7 +712,7 @@ input,select,textarea{max-width:100%;min-width:0}
 
 <div id="app" class="hide">
 <aside id="side" aria-label="Main navigation" aria-hidden="true" inert><div class="side-head"><div class="logo"><span class="dot"></span>Vaani</div><button type="button" class="ic side-close" id="sideCloseBtn" aria-label="Close sidebar" title="Close sidebar" onclick="closeSidebar(event)">×</button></div>
-<button class="btn ghost" onclick="newChat()">+ New chat</button><button class="btn ghost hide" id="adminBtn" onclick="adminOpen()">⚙ Admin panel</button>
+<button class="btn ghost" onclick="newChat()">+ New chat</button><button class="btn ghost hide" id="adminBtn" onclick="location.assign('/admin')">⚙ Admin panel</button>
 <div class="hist" id="hist"></div>
 <div class="cred"><div><span class="small">Credits left</span><br><b id="cr">50</b></div><button class="btn pri" style="padding:.5rem .9rem" onclick="buyOpen()">Top up</button></div>
 <button class="me" onclick="profOpen()"><span class="av" id="av">D</span><span><b id="nm">Demo User</b><br><span class="small">Profile</span></span></button><section id="profilePanel" aria-label="Account profile"></section></aside><button type="button" class="sidebar-scrim" aria-label="Close sidebar" aria-hidden="true" tabindex="-1" onclick="closeSidebar(event)"></button>
@@ -742,7 +742,10 @@ loop();
 const SB_URL='https://voohqnqyspxdlyaqygof.supabase.co',SB_KEY='sb_publishable__GL22Bcvbk0VC-uhhrsQ1Q_9edvV9OD';
 const sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 let user=null,prof=null,chats=[],cur=null,busy=false,pendingImages=[];
-function modal(h){const isProfile=h.includes('<h2>Your profile</h2>');$('mod').innerHTML=`<div class="ov ${'${isProfile?\'profile-overlay\':\'\'}'}" onclick="if(event.target===this)closeM()"><div class="mod ${'${isProfile?\'profile-view\':\'\'}'}" role="dialog" aria-modal="true">${h}</div></div>`}
+function modal(h){
+ const isProfile=String(h).includes('<h2>Your profile</h2>');
+ $('mod').innerHTML='<div class="ov '+(isProfile?'profile-overlay':'')+'" onclick="if(event.target===this)closeM()"><div class="mod '+(isProfile?'profile-view':'')+'" role="dialog" aria-modal="true">'+h+'</div></div>';
+}
 function closeM(){$('mod').innerHTML=''}
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),2800)}
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -967,9 +970,7 @@ sb.auth.onAuthStateChange((ev,session)=>{
     document.documentElement.classList.remove('direct-chat','auth-pending');
     user=null;prof=null;chats=[];cur=null;entering=false;chatHandoff=null;
     $('side').classList.remove('open','profile-open');
-    $('side').style.setProperty('transform','translateX(-105%)','important');
-    $('side').style.setProperty('visibility','hidden','important');
-    $('side').style.setProperty('pointer-events','none','important');
+    syncSidebarControls();
     $('profilePanel').innerHTML='';
     $('app').classList.add('hide');
     $('land').classList.remove('hide');
@@ -1007,9 +1008,7 @@ async function out(){
  document.documentElement.classList.remove('direct-chat','auth-pending');
  const side=$('side');
  side.classList.remove('open','profile-open');
- side.style.setProperty('transform','translateX(-105%)','important');
- side.style.setProperty('visibility','hidden','important');
- side.style.setProperty('pointer-events','none','important');
+ syncSidebarControls();
  $('profilePanel').innerHTML='';
  window.scrollTo(0,0);
  try{
@@ -1018,7 +1017,7 @@ async function out(){
   user=null;prof=null;chats=[];cur=null;entering=false;chatHandoff=null;
  }catch(e){
   // If sign-out fails, restore the signed-in interface instead of leaving a false logged-out screen.
-  if(user){land.classList.add('hide');app.classList.remove('hide');}
+  if(user){land.classList.add('hide');app.classList.remove('hide');setSidebarOpen(false);syncResponsiveLayout();}
   toast('Sign out failed: '+(e.message||'Please try again'));
  }
 }
@@ -1027,7 +1026,7 @@ async function buy(packId){try{if(!window.Razorpay)throw new Error('Razorpay Che
 function profOpen(){
  const side=$('side');
  if(side.classList.contains('profile-open')){profileClose();return}
- const adminEntry=prof&&prof.is_admin===true&&!prof.is_banned?'<button class="btn pri" style="width:100%;margin:.8rem 0" onclick="adminOpen()">♛ Admin dashboard ↗</button>':'';
+ const adminEntry=prof&&prof.is_admin===true&&!prof.is_banned?'<button class="btn pri" style="width:100%;margin:.8rem 0" onclick="location.assign('/admin')">♛ Admin dashboard ↗</button>':'';
  $('profilePanel').innerHTML=`<div class="profile-head"><h2>Your profile</h2><button class="ic" aria-label="Close profile" onclick="profileClose()">×</button></div><div class="row"><span>Name</span><b>${esc(prof?.full_name||user?.email?.split('@')[0]||'-')}</b></div><div class="row"><span>Email</span><b>${esc(user?.email||'-')}</b></div><div class="row"><span>Credits</span><b>${prof?.credits??0}</b></div><div class="row"><span>Chats</span><b>${chats.length}</b></div>${adminEntry}<div class="profile-actions"><button class="btn ghost" onclick="profileClose()">Back to chats</button><button class="btn ghost" onclick="out()">Sign out</button></div>`;
  side.classList.add('profile-open');
 }
@@ -1055,17 +1054,18 @@ async function open_(id){
  const selected=chats.find(c=>c.id===id);if(!selected)return;
  cur=selected;
  try{
-  if(cur.m===null){
+  if(selected.m===null){
    const r=await sb.from('messages').select('role,content').eq('chat_id',id).order('created_at');
    if(r.error)throw r.error;
-   cur.m=(r.data||[]).map(x=>({r:x.role==='user'?'u':'b',x:x.content}));
+   selected.m=(r.data||[]).map(x=>({r:x.role==='user'?'u':'b',x:x.content}));
   }
-  draw();
-  profileClose();setSidebarOpen(false);
+  // Ignore an older history request if another chat was selected while it loaded.
+  if(cur!==selected)return;
+  draw();profileClose();setSidebarOpen(false);
   $('app').classList.add('full-chat');syncSidebarControls();
   const btn=$('expandChatBtn');if(btn){btn.textContent='⤢';btn.title='Show sidebar';btn.setAttribute('aria-label','Show sidebar');btn.setAttribute('aria-pressed','true')}
   const menu=document.querySelector('#app .top .menu');if(menu){menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open sidebar')}
- }catch(e){toast('Could not open this chat: '+(e.message||'Please retry'))}
+ }catch(e){if(cur===selected)toast('Could not open this chat: '+(e.message||'Please retry'))}
 }
 function draw(){
  $('hist').innerHTML='<small>History</small>'+chats.map(c=>`<div class="hist-row ${cur&&c.id===cur.id?'active':''}"><button class="hist-open" title="${esc(c.t)}" onclick="open_('${c.id}')">${esc(c.t)}</button><button class="hist-delete" title="Delete chat" aria-label="Delete chat: ${esc(c.t)}" onclick="deleteChat('${c.id}',event)">×</button></div>`).join('');
@@ -1139,7 +1139,7 @@ async function send(){
 
 async function adminOpen(){
  try{const d=await api('admin-data');const settings=Object.fromEntries((d.settings||[]).map(x=>[x.key,x.value]));
- const users=(d.users||[]).map(u=>`<tr><td>${esc(u.email||u.id)}</td><td>${Number(u.credits)}</td><td>${u.is_admin?'Admin':'User'}</td><td>${u.is_banned?'Banned':'Active'}</td><td><button class="btn ghost" onclick="adminUser('${u.id}','is_banned',${!u.is_banned})">${u.is_banned?'Unban':'Ban'}</button> <button class="btn ghost" onclick="adminCredit('${u.id}')">+ Credits</button> <button class="btn ghost" onclick="adminUser('${u.id}','is_admin',${!u.is_admin})">${u.is_admin?'Remove admin':'Make admin'}</button></td></tr>`).join('');
+ const users=(d.users||[]).map(u=>`<tr><td>${esc(u.email||u.id)}</td><td>${Number(u.credits)}</td><td>${u.is_admin?'Admin':'User'}</td><td>${u.is_banned?'Banned':'Active'}</td><td><button class="btn ghost" onclick="adminUser('${u.id}','is_banned',${!u.is_banned})">${u.is_banned?'Unban':'Ban'}</button> <button class="btn ghost" onclick="adminCredit('${u.id}')">+ Credits</button></td></tr>`).join('');
  const packs=(d.packs||[]).map(k=>`<div class="row"><span><b>${esc(k.name)}</b><br><small>${k.credits} credits · ₹${(k.price_paise/100).toFixed(2)}</small></span><button class="btn ghost" onclick="adminEditPack(${k.id},${k.credits},${k.price_paise},${k.active})">Edit</button></div>`).join('');
  const orders=(d.orders||[]).slice(0,40).map(o=>`<tr><td>${esc(o.razorpay_order_id)}</td><td>₹${(o.amount_paise/100).toFixed(2)}</td><td>${o.credits}</td><td>${esc(o.status)}</td><td>${esc(String(o.created_at||'').slice(0,10))}</td></tr>`).join('');
  modal(`<div class="admin-modal"><div style="display:flex;justify-content:space-between;gap:1rem;align-items:center"><h2>Vaani Admin</h2><button class="btn ghost" onclick="closeM()">Close</button></div><p>Server-protected controls. Changes take effect immediately.</p><div class="admin-stats"><div class="pack"><small>Users</small><h2>${d.stats?.users??0}</h2></div><div class="pack"><small>Banned</small><h2>${d.stats?.banned??0}</h2></div><div class="pack"><small>Revenue</small><h2>₹${Number(d.stats?.revenue_inr??0).toFixed(2)}</h2></div><div class="pack"><small>Messages</small><h2>${d.stats?.messages??0}</h2></div></div><h3>AI & billing settings</h3><div class="admin-form"><label>Gemini model<input id="adm-model" value="${esc(String(settings.model??''))}"></label><label>Credits per 1k input tokens<input id="adm-inrate" type="number" min="0" value="${Number(settings.credits_per_1k_input??1)}"></label><label>Credits per 1k output tokens<input id="adm-outrate" type="number" min="0" value="${Number(settings.credits_per_1k_output??4)}"></label><label>Signup bonus credits<input id="adm-free" type="number" min="0" value="${Number(settings.free_credits??50)}"></label><label class="wide">System prompt<textarea id="adm-prompt" rows="3">${esc(String(settings.system_prompt??''))}</textarea></label><label><input id="adm-maint" type="checkbox" ${settings.maintenance_mode===true?'checked':''}> Maintenance mode</label><button class="btn pri" onclick="adminSaveSettings()">Save settings</button></div><h3>Credit packs</h3><button class="btn ghost" onclick="adminCreatePack()">Add pack</button>${packs}<h3>Users (latest 200)</h3><div class="admin-table"><table><thead><tr><th>Email</th><th>Credits</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>${users||'<tr><td colspan="5">No users yet</td></tr>'}</tbody></table></div><h3>Orders (latest 200)</h3><div class="admin-table"><table><thead><tr><th>Razorpay order</th><th>Amount</th><th>Credits</th><th>Status</th><th>Date</th></tr></thead><tbody>${orders||'<tr><td colspan="5">No orders yet</td></tr>'}</tbody></table></div><h3>Recent credit ledger</h3><div class="admin-table"><table><thead><tr><th>User ID</th><th>Delta</th><th>Reason</th><th>Reference</th></tr></thead><tbody>${(d.ledger||[]).slice(0,50).map(l=>`<tr><td>${esc(l.user_id)}</td><td>${Number(l.delta)}</td><td>${esc(l.reason)}</td><td>${esc(l.ref||'')}</td></tr>`).join('')}</tbody></table></div></div>`);
@@ -1149,7 +1149,7 @@ async function adminUser(userId,key,value){try{await api('admin-user',{user_id:u
 async function adminCredit(userId){const amount=Number(prompt('Enter credit change (positive to add, negative to remove)','100'));if(!Number.isInteger(amount)||amount===0||Math.abs(amount)>100000)return;try{await api('admin-credit',{user_id:userId,amount});toast('Credits adjusted');adminOpen()}catch(e){toast(e.message)}}
 async function adminCreatePack(){const name=prompt('Pack name');if(!name)return;const credits=Number(prompt('Credits in pack','100'));const price=Number(prompt('Price in rupees','99'));if(!Number.isInteger(credits)||credits<1||!Number.isFinite(price)||price<=0)return;try{await api('admin-pack',{name,credits,price_paise:Math.round(price*100),active:true,is_popular:false});toast('Pack created');await loadPacks();adminOpen()}catch(e){toast(e.message)}}
 async function adminEditPack(id,credits,pricePaise,active){const c=Number(prompt('Credits in pack',String(credits)));if(!Number.isInteger(c)||c<1)return;const p=Number(prompt('Price in rupees',String(pricePaise/100)));if(!Number.isFinite(p)||p<=0)return;const enabled=confirm('OK = active, Cancel = inactive');try{await api('admin-pack',{id,credits:c,price_paise:Math.round(p*100),active:enabled});toast('Pack updated');await loadPacks();adminOpen()}catch(e){toast(e.message)}}
-async function adminSaveSettings(){const values=[['model',$('adm-model').value],['credits_per_1k_input',Number($('adm-inrate').value)],['credits_per_1k_output',Number($('adm-outrate').value)],['free_credits',Number($('adm-free').value)],['system_prompt',$('adm-prompt').value],['maintenance_mode',$('adm-maint').checked]];try{for(const [key,value] of values)await api('admin-setting',{key,value});toast('Settings saved');adminOpen()}catch(e){toast(e.message)}}
+async function adminSaveSettings(){const values=[{key:'model',value:$('adm-model').value},{key:'credits_per_1k_input',value:Number($('adm-inrate').value)},{key:'credits_per_1k_output',value:Number($('adm-outrate').value)},{key:'free_credits',value:Number($('adm-free').value)},{key:'system_prompt',value:$('adm-prompt').value},{key:'maintenance_mode',value:$('adm-maint').checked}];if(values.slice(1,3).some(x=>!Number.isFinite(x.value)||x.value<0)||!Number.isFinite(values[3].value)||values[3].value<0){toast('Credit settings must be valid non-negative numbers.');return}try{await api('admin-settings-batch',{values});toast('All settings saved successfully');adminOpen()}catch(e){toast('Settings were not saved: '+e.message)}}
 function legalOpen(kind){const docs={privacy:['Privacy Policy','Vaani stores account profile information, chat messages, credit usage and payment references to provide the service. Gemini requests are processed by Google. Razorpay handles payment details; Vaani does not store card or UPI credentials. Do not submit sensitive personal information in chats. Publish a contact address and data-retention/deletion process before public launch.'],terms:['Terms & Conditions','Vaani provides AI-generated responses that may be inaccurate; verify important information independently. Credits are usage units and are not cash. Access may be suspended for abuse, fraud or security reasons. Do not use the service unlawfully. Publish the operator name, jurisdiction, and final commercial terms before accepting live payments.'],refund:['Refund Policy','Payments are processed by Razorpay. Do not promise automatic refunds until your refund process is configured. For duplicate or failed transactions, retain the Razorpay payment ID and contact the site operator. Add a verified support contact and final refund timeline before enabling live payments.'],support:['Contact Us','Support contact details must be configured by the site owner before launch. If a payment is pending, keep the Razorpay order ID and payment ID for support.']};const [title,body]=docs[kind]||docs.support;const fullPage=({privacy:'/privacy.html',terms:'/terms.html',refund:'/refund.html',support:'/contact.html'})[kind]||'/contact.html';modal('<h2>'+esc(title)+'</h2><p>'+esc(body)+'</p><p><a href="'+fullPage+'" target="_blank" rel="noopener">Open full page</a></p><button class="btn pri" style="width:100%" onclick="closeM()">Close</button>')}
 
 $('sb').onclick=send;
