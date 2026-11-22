@@ -602,7 +602,7 @@ let qi=0,dc=50;function loop(){const [q,a]=Q[qi++%Q.length],dq=$('dq'),da=$('da'
 loop();
 // ===== Supabase =====
 const SB_URL='https://voohqnqyspxdlyaqygof.supabase.co',SB_KEY='sb_publishable__GL22Bcvbk0VC-uhhrsQ1Q_9edvV9OD';
-const sb=window.supabase.createClient(SB_URL,SB_KEY);
+const sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 let user=null,prof=null,chats=[],cur=null,busy=false,pendingImages=[];
 function modal(h){const isProfile=h.includes('<h2>Your profile</h2>');$('mod').innerHTML=`<div class="ov ${'${isProfile?\'profile-overlay\':\'\'}'}" onclick="if(event.target===this)closeM()"><div class="mod ${'${isProfile?\'profile-view\':\'\'}'}" role="dialog" aria-modal="true">${h}</div></div>`}
 function closeM(){$('mod').innerHTML=''}
@@ -762,10 +762,25 @@ sb.auth.onAuthStateChange((ev,session)=>{
     }
     return;
   }
-  // A null session can be emitted during initial boot. Only a real sign-out
-  // event should clear the authenticated UI.
   if(ev!=='SIGNED_OUT')return;
-  queueMicrotask(()=>{
+  // A delayed SIGNED_OUT event can race with a newer successful OAuth session.
+  // Re-read the authoritative session after the auth callback releases its lock;
+  // never let a stale event hide a valid signed-in chat.
+  queueMicrotask(async()=>{
+    let currentSession=null;
+    try{
+      const {data,error}=await sb.auth.getSession();
+      if(error)throw error;
+      currentSession=data?.session||null;
+    }catch(e){
+      console.warn('auth_signout_recheck_failed',String(e?.message||e||'unknown').slice(0,160));
+      // If session state cannot be verified, preserve the current UI.
+      return;
+    }
+    if(currentSession){
+      if(!user)void showChatForSession(currentSession);
+      return;
+    }
     document.documentElement.classList.remove('direct-chat','auth-pending');
     user=null;prof=null;chats=[];cur=null;entering=false;chatHandoff=null;
     $('side').classList.remove('open','profile-open');
