@@ -13,8 +13,8 @@ describe("Vaani chat UI", () => {
       const html = readFileSync(new URL(path, import.meta.url), "utf8");
       expect(html).toContain("function newChat(){const app=$('app'),side=$('side')");
       expect(html).toContain("const chat=cur;const prompt=");
-      expect(html).toContain("chat.m.pop();chat.m.pop();draw()");
-      expect(html).toContain("if(cur===chat)$('msgs').scrollTop=1e9");
+      expect(html).toContain("const answerIndex=chat.m.indexOf(b)");
+      expect(html).toContain("if(cur===chat&&te.isConnected)");
     }
   });
 
