@@ -62,4 +62,23 @@ describe("Vaani chat UI", () => {
     expect(html).toContain("function formatReply(value)");
     expect(html).toContain("formatReply(m.x)");
   });
+
+  it("adds site-wide mobile breakpoints for landing, chat, overlays and admin", () => {
+    const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+    expect(html).toContain("Site-wide responsive finishing layer");
+    expect(html).toContain("@media (max-width:820px)");
+    expect(html).toContain("@media (max-width:420px)");
+    expect(html).toContain("@media (orientation:landscape) and (max-height:600px)");
+    expect(html).toContain("#land .hero{grid-template-columns:minmax(0,1fr)");
+    expect(html).toContain("#mod .admin-form{grid-template-columns:minmax(0,1fr)}");
+    expect(html).toContain("#app .m .t pre");
+  });
+
+  it("keeps legal content readable without horizontal overflow on phones", () => {
+    const css = readFileSync(new URL("../public/legal.css", import.meta.url), "utf8");
+    expect(css).toContain("Responsive legal pages");
+    expect(css).toContain("@media(max-width:480px)");
+    expect(css).toContain("overflow-wrap:anywhere");
+  });
+
 });
