@@ -57,7 +57,7 @@ describe("Vaani chat UI", () => {
     const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
     expect(html).toContain("prof&&prof.is_admin===true&&!prof.is_banned");
     expect(html).toContain("id=\"profilePanel\"");
-    expect(html).toContain("onclick=\"adminOpen()\"");
+    expect(html).toContain("onclick=\"location.assign(\'/admin\')\"");
     expect(html).toContain("Admin dashboard");
   });
 
