@@ -677,14 +677,29 @@ function toggleSidebar(event){
 }
 function syncResponsiveLayout(){
  const root=document.documentElement;
- const mobile=window.matchMedia('(max-width: 820px)').matches;
+ const ua=navigator.userAgent||'';
+ const mobileUA=/(Android|iPhone|iPod|Mobile)/i.test(ua);
+ const touchDevice=Number(navigator.maxTouchPoints||0)>0||window.matchMedia('(pointer:coarse)').matches;
+ const screenWidth=Number(window.screen?.width||window.innerWidth||0);
+ // OAuth can briefly restore a desktop-sized layout viewport on mobile browsers.
+ // Prefer the actual mobile/touch device signal as well as the CSS viewport width.
+ const mobile=window.matchMedia('(max-width: 820px)').matches||mobileUA||(touchDevice&&screenWidth<=1024);
  root.classList.toggle('mobile-layout',mobile);
  document.body?.classList.toggle('mobile-layout',mobile);
  const app=$('app'),side=$('side');
  if(!mobile&&side){side.classList.remove('open');app?.classList.remove('sidebar-open')}
 }
+function settleResponsiveLayout(){
+ return new Promise(resolve=>{
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+   syncResponsiveLayout();
+   resolve();
+  }));
+ });
+}
 syncResponsiveLayout();
 window.addEventListener('resize',syncResponsiveLayout,{passive:true});
+window.visualViewport?.addEventListener('resize',()=>requestAnimationFrame(syncResponsiveLayout),{passive:true});
 window.addEventListener('orientationchange',()=>requestAnimationFrame(syncResponsiveLayout),{passive:true});
 let entering=false;
 async function enter(session){
@@ -733,14 +748,19 @@ async function showChatForSession(session){
   if(sidebar){sidebar.style.setProperty('visibility','visible','important');sidebar.style.setProperty('pointer-events','auto','important');}
   if(chatHandoff)return chatHandoff;
   chatHandoff=(async()=>{
-    document.documentElement.classList.add('direct-chat');
+    // Keep the three-dot loader visible until the authenticated shell has
+    // completed its responsive layout pass; never hard-reload the OAuth session.
+    $('auth-loader').classList.remove('hide');
+    document.documentElement.classList.add('auth-pending','direct-chat');
     $('land').classList.add('hide');
+    syncResponsiveLayout();
     if(!user) await enter(session);
     while(entering) await new Promise(resolve=>setTimeout(resolve,20));
     if(user){
       $('land').classList.add('hide');
       $('app').classList.remove('hide');
     }
+    await settleResponsiveLayout();
     $('auth-loader').classList.add('hide');
     document.documentElement.classList.remove('auth-pending');
   })().catch(e=>{
