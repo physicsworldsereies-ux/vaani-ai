@@ -503,6 +503,50 @@ html,body{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
  #app .comp{padding:.65rem clamp(.7rem,3vw,1.25rem) calc(.65rem + env(safe-area-inset-bottom,0px))!important}
 }
 
+
+/* Consolidated responsive shell: desktop rail, mobile drawer, no forced inline geometry. */
+#app{display:grid;grid-template-columns:280px minmax(0,1fr);height:100dvh;height:100svh;min-height:0;overflow:hidden}
+#app>aside{min-width:0;min-height:0;position:relative!important;inset:auto!important;transform:none!important;width:auto!important;max-width:none!important;height:auto!important;z-index:2;box-shadow:none;overflow-y:auto}
+#app>main{min-width:0;min-height:0;grid-column:auto}
+#app .top .menu{display:none!important}
+#app .expand-chat{display:grid!important}
+#app.full-chat{grid-template-columns:minmax(0,1fr)}
+#app.full-chat>aside{display:none!important}
+#app.full-chat .top .menu{display:grid!important}
+#app .sidebar-scrim{display:none}
+#app .hist{min-height:0;overscroll-behavior:contain}
+#app .hist-row{min-width:0}
+#app .hist-row .hist-open{min-width:0}
+#app .hist-row .hist-delete{flex:0 0 30px;width:30px;height:30px;opacity:.8}
+#app>aside>.me{margin-top:auto!important;flex:0 0 auto}
+#app .top{min-height:58px}
+#app #msgs{overscroll-behavior:contain}
+#app .m .t{overflow-wrap:anywhere;word-break:break-word}
+#app .comp{padding-bottom:calc(.8rem + env(safe-area-inset-bottom,0px))}
+#app .box textarea{font-size:16px;min-width:0}
+@media(max-width:820px){
+ #app,#app.full-chat{display:grid;grid-template-columns:minmax(0,1fr);height:100dvh;height:100svh}
+ #app>main{grid-column:1/-1;width:100%;min-width:0}
+ #app>aside{position:fixed!important;inset:0 auto 0 0!important;width:min(82vw,300px)!important;max-width:300px!important;height:100dvh!important;height:100svh!important;z-index:1000!important;transform:translateX(-105%)!important;transition:transform .22s ease!important;overflow-y:auto!important;overscroll-behavior:contain;background:#080808!important;box-shadow:12px 0 40px #0008;padding:calc(.7rem + env(safe-area-inset-top,0px)) .7rem calc(.7rem + env(safe-area-inset-bottom,0px))!important}
+ #app>aside.open{transform:translateX(0)!important;display:flex!important}
+ #app .sidebar-scrim{display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.62);border:0;padding:0}
+ #app.sidebar-open .sidebar-scrim{display:block}
+ #app .top .menu{display:grid!important;flex:0 0 40px}
+ #app .expand-chat{display:none!important}
+ #app #msgs{padding:1rem .85rem!important}
+ #app .comp{padding:.6rem .7rem calc(.65rem + env(safe-area-inset-bottom,0px))!important}
+ #app .box{width:100%;min-width:0;gap:.2rem}
+ #app .box textarea{width:0;min-width:0;flex:1;font-size:16px;max-height:30dvh}
+ #app .m{gap:.65rem;margin-bottom:1.2rem}
+ #app .m .av{width:28px;height:28px;flex:0 0 28px}
+ #app .m.bot .t{font-size:1.02rem;line-height:1.75}
+ #app .m:not(.bot) .t{font-size:.98rem}
+}
+@media(min-width:821px){
+ #app>aside{position:relative!important;inset:auto!important;transform:none!important;width:auto!important;max-width:none!important;height:auto!important;z-index:2!important;box-shadow:none!important}
+ #app .sidebar-scrim{display:none!important}
+}
+@media(prefers-reduced-motion:reduce){#app>aside{transition:none!important}}
 </style>
 </head>
 <body>
@@ -533,7 +577,7 @@ html,body{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
 <button class="btn ghost" onclick="newChat()">+ New chat</button><button class="btn ghost hide" id="adminBtn" onclick="adminOpen()">⚙ Admin panel</button>
 <div class="hist" id="hist"></div>
 <div class="cred"><div><span class="small">Credits left</span><br><b id="cr">50</b></div><button class="btn pri" style="padding:.5rem .9rem" onclick="buyOpen()">Top up</button></div>
-<button class="me" onclick="profOpen()"><span class="av" id="av">D</span><span><b id="nm">Demo User</b><br><span class="small">Profile</span></span></button><section id="profilePanel" aria-label="Account profile"></section></aside>
+<button class="me" onclick="profOpen()"><span class="av" id="av">D</span><span><b id="nm">Demo User</b><br><span class="small">Profile</span></span></button><section id="profilePanel" aria-label="Account profile"></section></aside><button type="button" class="sidebar-scrim" aria-label="Close sidebar" onclick="toggleSidebar()"></button>
 <main><div class="top"><button type="button" class="ic menu" onclick="toggleSidebar()" aria-controls="side" aria-expanded="false" aria-label="Open sidebar">☰</button><b id="ct">New chat</b><button type="button" class="ic expand-chat" id="expandChatBtn" onclick="toggleFullChat()" title="Full chat screen" aria-label="Expand chat" aria-pressed="false">⛶</button></div>
 <div id="msgs"><div class="col" id="col"></div></div>
 <div class="comp"><div id="imagePreview" class="image-preview"></div><div class="box"><div class="attach-tools"><button class="ic" aria-label="Choose image from gallery" title="Gallery" onclick="$('galleryInput').click()">▧</button><button class="ic" aria-label="Take a photo" title="Camera" onclick="$('cameraInput').click()">📷</button></div><input id="galleryInput" type="file" accept="image/*" multiple hidden onchange="pickImages(this)"><input id="cameraInput" type="file" accept="image/*" capture="environment" hidden onchange="pickImages(this)">
@@ -601,16 +645,11 @@ function toggleSidebar(event){
  const app=$('app'),side=$('side'),btn=document.querySelector('#app .top .menu');
  if(event){event.preventDefault();event.stopPropagation()}
  if(!app||!side)return;
- // History selection intentionally enters full-chat mode. When leaving that mode,
- // always open the sidebar; do not let a stale .open class turn this into a no-op.
  const wasFullChat=app.classList.contains('full-chat');
  app.classList.remove('full-chat');
  const opening=wasFullChat||!side.classList.contains('open');
  side.classList.toggle('open',opening);
- side.style.setProperty('transform',opening?'translateX(0)':'translateX(-105%)','important');
- side.style.setProperty('visibility','visible','important');
- side.style.setProperty('pointer-events','auto','important');
- side.style.setProperty('z-index','1000','important');
+ app.classList.toggle('sidebar-open',opening);
  const expand=$('expandChatBtn');
  if(expand){
   expand.textContent='⛶';
@@ -622,28 +661,11 @@ function toggleSidebar(event){
 }
 function syncResponsiveLayout(){
  const root=document.documentElement;
- const viewport=document.querySelector('meta[name="viewport"]');
- if(viewport)viewport.setAttribute('content','width=device-width, initial-scale=1, viewport-fit=cover');
- const width=Math.min(window.innerWidth||Infinity,root.clientWidth||Infinity);
- const mobile=window.matchMedia('(max-width: 820px)').matches||width<=820;
+ const mobile=window.matchMedia('(max-width: 820px)').matches;
  root.classList.toggle('mobile-layout',mobile);
  document.body?.classList.toggle('mobile-layout',mobile);
  const app=$('app'),side=$('side');
- if(app){
-  app.style.setProperty('grid-template-columns','minmax(0,1fr)','important');
-  app.style.setProperty('width','100%','important');
-  app.style.setProperty('max-width','100%','important');
- }
- if(side){
-  side.style.setProperty('position','fixed','important');
-  side.style.setProperty('inset','0 auto 0 0','important');
-  side.style.setProperty('width','min(82vw,300px)','important');
-  side.style.setProperty('max-width','300px','important');
-  side.style.setProperty('height','100dvh','important');
-  side.style.setProperty('z-index','1000','important');
-  side.style.setProperty('transform',side.classList.contains('open')?'translateX(0)':'translateX(-105%)','important');
- }
- if(!mobile&&side)side.classList.remove('open');
+ if(!mobile&&side){side.classList.remove('open');app?.classList.remove('sidebar-open')}
 }
 syncResponsiveLayout();
 window.addEventListener('resize',syncResponsiveLayout,{passive:true});
@@ -789,16 +811,13 @@ function profileClose(){$('side').classList.remove('profile-open');$('profilePan
 function toggleFullChat(){
  const app=$('app'),side=$('side'),btn=$('expandChatBtn');
  const full=app.classList.toggle('full-chat');
- side.classList.remove('open');
- side.style.setProperty('transform','translateX(-105%)','important');
- side.style.setProperty('visibility','visible','important');
- side.style.setProperty('pointer-events','auto','important');
+ side.classList.remove('open');app.classList.remove('sidebar-open');
  btn.textContent=full?'⤢':'⛶';
  btn.title=full?'Show sidebar':'Full chat screen';
  btn.setAttribute('aria-label',full?'Show sidebar':'Expand chat');
  btn.setAttribute('aria-pressed',String(full));
 }
-function newChat(){const app=$('app'),side=$('side');app.classList.remove('full-chat');profileClose();cur={id:null,t:'New chat',m:[]};$('in').value='';pendingImages=[];showImagePreview();draw();side.classList.remove('open');side.style.removeProperty('transform');side.style.removeProperty('visibility');side.style.removeProperty('pointer-events');const menu=document.querySelector('#app .top .menu');if(menu){menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open sidebar')}}
+function newChat(){const app=$('app'),side=$('side');app.classList.remove('full-chat','sidebar-open');profileClose();cur={id:null,t:'New chat',m:[]};$('in').value='';pendingImages=[];showImagePreview();draw();side.classList.remove('open');const menu=document.querySelector('#app .top .menu');if(menu){menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open sidebar')}}
 async function open_(id){
  const selected=chats.find(c=>c.id===id);if(!selected)return;
  cur=selected;
@@ -809,11 +828,8 @@ async function open_(id){
    cur.m=(r.data||[]).map(x=>({r:x.role==='user'?'u':'b',x:x.content}));
   }
   draw();
-  $('app').classList.add('full-chat');
+  $('app').classList.add('full-chat');$('app').classList.remove('sidebar-open');
   $('side').classList.remove('open','profile-open');
-  $('side').style.setProperty('transform','translateX(-105%)','important');
-  $('side').style.setProperty('visibility','visible','important');
-  $('side').style.setProperty('pointer-events','auto','important');
   const btn=$('expandChatBtn');if(btn){btn.textContent='⤢';btn.title='Show sidebar';btn.setAttribute('aria-label','Show sidebar');btn.setAttribute('aria-pressed','true')}
   const menu=document.querySelector('#app .top .menu');if(menu){menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open sidebar')}
  }catch(e){toast('Could not open this chat: '+(e.message||'Please retry'))}
@@ -834,25 +850,58 @@ async function deleteChat(id,event){
 const row=m=>`<div class="m ${m.r==='b'?'bot':''}">${m.r==='b'?'<span class="av" aria-hidden="true">V</span>':''}<div class="t">${m.r==='b'?formatReply(m.x):(m.imgs&&m.imgs.length?'<div class="sent-images">'+imageMarkup(m.imgs)+'</div>':'')+esc(m.x)}</div></div>`;
 function ask(t){$('in').value=t;send()}
 async function send(){
-const v=$('in').value.trim(),imgs=pendingImages.slice();if((!v&&!imgs.length)||busy)return;if(!user){authOpen();return}if(prof.credits<1){buyOpen();return}
-const chat=cur;const prompt=v||'Please describe and help me with the attached image.';pendingImages=[];showImagePreview();busy=true;$('in').value='';const prior=chat.id;chat.m.push({r:'u',x:v,imgs});const b={r:'b',x:''};chat.m.push(b);draw();
-const te=$('col').lastElementChild.querySelector('.t');te.innerHTML='<span class="dots"><i></i><i></i><i></i></span>';
-try{
- const {data:{session}}=await sb.auth.getSession();if(!session?.access_token)throw new Error('unauthorized');
- const res=await fetch(WORKER_URL+'/api/chat',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({chat_id:prior||null,message:prompt,images:imgs})});
- if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'AI request failed')}
- const rd=res.body.getReader(),dec=new TextDecoder();let buf='';
- for(;;){const {done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
-  while((i=buf.indexOf('\n\n'))>=0){const ev=buf.slice(0,i);buf=buf.slice(i+2);if(!ev.startsWith('data:'))continue;let j;try{j=JSON.parse(ev.slice(5).trim())}catch{continue}
-   if(j.type==='meta'){if(!chat.id){chat.id=j.chat_id;chat.t=prompt.slice(0,36);if(!chats.some(c=>c.id===chat.id))chats.unshift(chat)}}
-   else if(j.type==='delta'){b.x+=j.text;te.textContent=b.x;if(cur===chat)$('msgs').scrollTop=1e9}
-   else if(j.type==='done'){if(Number.isFinite(j.credits_left)){prof.credits=j.credits_left;$('cr').textContent=prof.credits}}
-   else if(j.type==='error')throw new Error(j.error||'AI request failed');
+ const v=$('in').value.trim(),imgs=pendingImages.slice();
+ if((!v&&!imgs.length)||busy)return;
+ if(!user){authOpen();return}
+ if(Number(prof?.credits??0)<1){buyOpen();return}
+ const chat=cur;if(!chat)return;
+ const prompt=v||'Please describe and help me with the attached image.';
+ pendingImages=[];showImagePreview();busy=true;$('in').value='';
+ const prior=chat.id;
+ chat.m.push({r:'u',x:v,imgs});
+ const b={r:'b',x:''};chat.m.push(b);draw();
+ const te=$('col').lastElementChild.querySelector('.t');
+ te.innerHTML='<span class="dots" role="status" aria-label="Vaani is responding"><i></i><i></i><i></i></span>';
+ try{
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session?.access_token)throw new Error('unauthorized');
+  const res=await fetch(WORKER_URL+'/api/chat',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({chat_id:prior||null,message:prompt,images:imgs})});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'AI request failed')}
+  if(!res.body)throw new Error('AI stream unavailable');
+  const rd=res.body.getReader(),dec=new TextDecoder();let buf='',completed=false;
+  const handleEvent=eventText=>{
+   const data=eventText.split(/\r?\n/).filter(line=>line.startsWith('data:')).map(line=>line.slice(5).trim()).join('\n');
+   if(!data)return;
+   let j;try{j=JSON.parse(data)}catch{return}
+   if(j.type==='meta'){
+    if(!chat.id){chat.id=j.chat_id;chat.t=prompt.slice(0,36);if(!chats.some(c=>c.id===chat.id))chats.unshift(chat)}
+   }else if(j.type==='delta'){
+    b.x+=j.text||'';
+    if(cur===chat&&te.isConnected){te.textContent=b.x;$('msgs').scrollTop=1e9}
+   }else if(j.type==='done'){
+    completed=true;
+    if(Number.isFinite(j.credits_left)){prof.credits=j.credits_left;$('cr').textContent=prof.credits}
+   }else if(j.type==='error')throw new Error(j.error||'AI request failed');
+  };
+  for(;;){
+   const {done,value}=await rd.read();if(done)break;
+   buf+=dec.decode(value,{stream:true});let match;
+   while((match=/\r?\n\r?\n/.exec(buf))){
+    const eventText=buf.slice(0,match.index);buf=buf.slice(match.index+match[0].length);handleEvent(eventText);
+   }
   }
- }
- if(!b.x)throw new Error('AI returned an empty answer');draw();
-}catch(e){chat.m.pop();chat.m.pop();draw();const M={no_credits:'Your credits are finished. Please top up.',banned:'This account is blocked.',maintenance:'We are under maintenance. Please try again shortly.',unauthorized:'Please sign in again.',rate_limited:'Too many requests. Please wait a moment.',ai_not_configured:'AI provider is not configured on the server.',ai_auth_error:'AI provider rejected the server API key. Check the Gemini key and API access.',ai_model_unavailable:'The selected Gemini model is unavailable. Choose a supported model in Admin settings.',ai_rate_limited:'Gemini is rate-limiting requests. Wait briefly and retry.',database_error:'The AI replied, but saving chat/credits failed. Please retry shortly.',empty_reply:'The AI returned an empty response. Please retry.',chat_not_found:'This chat could not be found. Start a new chat.',ai_error:'The AI service failed. Please retry shortly.'};toast(M[e.message]||e.message||'AI request failed')}
-finally{busy=false}
+  buf+=dec.decode();if(buf.trim())handleEvent(buf);
+  if(!completed)throw new Error('AI stream ended unexpectedly');
+  if(!b.x)throw new Error('AI returned an empty answer');
+  if(cur===chat)draw();
+ }catch(e){
+  const message=String(e?.message||'AI request failed');
+  const answerIndex=chat.m.indexOf(b);if(answerIndex>=0)chat.m.splice(answerIndex,1);
+  const userIndex=chat.m.findIndex(m=>m.r==='u'&&m.x===v&&m.imgs===imgs);if(userIndex>=0)chat.m.splice(userIndex,1);
+  if(cur===chat)draw();
+  const M={no_credits:'Your credits are finished. Please top up.',banned:'This account is blocked.',maintenance:'We are under maintenance. Please try again shortly.',unauthorized:'Please sign in again.',rate_limited:'Too many requests. Please wait a moment.',ai_not_configured:'AI provider is not configured on the server.',ai_auth_error:'AI provider rejected the server API key. Check the Gemini key and API access.',ai_model_unavailable:'The selected Gemini model is unavailable. Choose a supported model in Admin settings.',ai_rate_limited:'Gemini is rate-limiting requests. Wait briefly and retry.',database_error:'The AI replied, but saving chat/credits failed. Please retry shortly.',empty_reply:'The AI returned an empty response. Please retry.',chat_not_found:'This chat could not be found. Start a new chat.',ai_error:'The AI service failed. Please retry shortly.'};
+  toast(M[message]||message||'AI request failed');
+ }finally{busy=false}
 }
 
 async function adminOpen(){
