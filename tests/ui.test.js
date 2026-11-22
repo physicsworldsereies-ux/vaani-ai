@@ -102,6 +102,7 @@ describe("Vaani chat UI", () => {
     const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
     expect(html).toContain('id="adminBtn" onclick="location.assign(\'/admin\')"');
     expect(html).toContain("location.assign('/admin')");
+    expect(html).toContain("location.assign('/')");
     expect(html).not.toContain("adminUser('${u.id}','is_admin'");
   });
 
