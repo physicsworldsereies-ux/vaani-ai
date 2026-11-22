@@ -6,24 +6,8 @@ describe("Vaani chat UI", () => {
     const root = readFileSync(new URL("../index.html", import.meta.url), "utf8");
     const deployed = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
     expect(root).toBe(deployed);
-    it("adds site-wide mobile breakpoints for landing, chat, overlays and admin", () => {
-    const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
-    expect(html).toContain("Site-wide responsive finishing layer");
-    expect(html).toContain("@media (max-width:820px)");
-    expect(html).toContain("@media (max-width:420px)");
-    expect(html).toContain("@media (orientation:landscape) and (max-height:600px)");
-    expect(html).toContain("#land .hero{grid-template-columns:minmax(0,1fr)");
-    expect(html).toContain("#mod .admin-form{grid-template-columns:minmax(0,1fr)}");
-    expect(html).toContain("#app .m .t pre");
   });
 
-  it("keeps legal content readable without horizontal overflow on phones", () => {
-    const css = readFileSync(new URL("../public/legal.css", import.meta.url), "utf8");
-    expect(css).toContain("Responsive legal pages");
-    expect(css).toContain("@media(max-width:480px)");
-    expect(css).toContain("overflow-wrap:anywhere");
-  });
-});
   it("keeps New Chat state and in-flight responses isolated in both app entrypoints", () => {
     for (const path of ["../index.html", "../public/index.html"]) {
       const html = readFileSync(new URL(path, import.meta.url), "utf8");
@@ -64,8 +48,8 @@ describe("Vaani chat UI", () => {
   it("only renders the profile admin shortcut for an active authorized admin profile", () => {
     const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
     expect(html).toContain("prof&&prof.is_admin===true&&!prof.is_banned");
-    expect(html).toContain("id=\"profilePanel\"");
-    expect(html).toContain("onclick=\"adminOpen()\"");
+    expect(html).toContain("id=\\"profilePanel\\"");
+    expect(html).toContain("onclick=\\"adminOpen()\\"");
     expect(html).toContain("Admin dashboard");
   });
 
@@ -77,5 +61,23 @@ describe("Vaani chat UI", () => {
     expect(html).toContain("#app .col{width:100%;max-width:none;margin:0}");
     expect(html).toContain("function formatReply(value)");
     expect(html).toContain("formatReply(m.x)");
+  });
+
+  it("adds site-wide mobile breakpoints for landing, chat, overlays and admin", () => {
+    const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+    expect(html).toContain("Site-wide responsive finishing layer");
+    expect(html).toContain("@media (max-width:820px)");
+    expect(html).toContain("@media (max-width:420px)");
+    expect(html).toContain("@media (orientation:landscape) and (max-height:600px)");
+    expect(html).toContain("#land .hero{grid-template-columns:minmax(0,1fr)");
+    expect(html).toContain("#mod .admin-form{grid-template-columns:minmax(0,1fr)}");
+    expect(html).toContain("#app .m .t pre");
+  });
+
+  it("keeps legal content readable without horizontal overflow on phones", () => {
+    const css = readFileSync(new URL("../public/legal.css", import.meta.url), "utf8");
+    expect(css).toContain("Responsive legal pages");
+    expect(css).toContain("@media(max-width:480px)");
+    expect(css).toContain("overflow-wrap:anywhere");
   });
 });
