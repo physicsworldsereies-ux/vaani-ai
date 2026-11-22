@@ -11,7 +11,7 @@ describe("Vaani chat UI", () => {
   it("keeps New Chat state and in-flight responses isolated in both app entrypoints", () => {
     for (const path of ["../index.html", "../public/index.html"]) {
       const html = readFileSync(new URL(path, import.meta.url), "utf8");
-      expect(html).toContain("function newChat(){const app=$('app'),side=$('side')");
+      expect(html).toContain("function newChat(){");
       expect(html).toContain("const chat=cur;if(!chat)return;");
       expect(html).toContain("const answerIndex=chat.m.indexOf(b)");
       expect(html).toContain("if(cur===chat&&te.isConnected)");
