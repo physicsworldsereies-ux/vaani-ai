@@ -731,7 +731,7 @@ const $=id=>document.getElementById(id);
 let PACKS=[{id:1,c:100,p:99},{id:2,c:500,p:399,b:1},{id:3,c:1500,p:999},{id:4,c:5000,p:2999,b:0}];
 const WORKER_URL=location.origin;
 async function api(action,payload={}){const {data}=await sb.auth.getSession();const token=data.session?.access_token;if(!token)throw new Error('Please sign in again.');const res=await fetch(WORKER_URL+'/api',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({action,...payload})});const out=await res.json().catch(()=>({error:'Invalid server response'}));if(!res.ok)throw new Error(out.error||'Request failed');return out;}
-function renderPacks(){$('packs').innerHTML=PACKS.map(k=>`<div class="pack${k.b?' best':''}">${k.b?'<span class="tag">Most popular</span>':''}<h3>${k.c} <small>credits</small></h3><div class="pr">₹${Number(k.p).toFixed(2)}</div><button class="btn ${k.b?'pri':'ghost'}" style="width:100%" onclick="${'user'?'buyOpen()':'authOpen()'}">Choose</button></div>`).join('')}renderPacks();
+function renderPacks(){$('packs').innerHTML=PACKS.map(k=>`<div class="pack${k.b?' best':''}">${k.b?'<span class="tag">Most popular</span>':''}<h3>${k.c} <small>credits</small></h3><div class="pr">₹${Number(k.p).toFixed(2)}</div><button class="btn ${k.b?'pri':'ghost'}" style="width:100%" onclick="${user?'buyOpen()':'authOpen()'}">Choose</button></div>`).join('')}
 // theme
 $('th').onclick=()=>{const r=document.documentElement,d=getComputedStyle(r).colorScheme==='dark';r.dataset.theme=d?'light':'dark'};
 // hero demo loop
@@ -742,6 +742,7 @@ loop();
 const SB_URL='https://voohqnqyspxdlyaqygof.supabase.co',SB_KEY='sb_publishable__GL22Bcvbk0VC-uhhrsQ1Q_9edvV9OD';
 const sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 let user=null,prof=null,chats=[],cur=null,busy=false,pendingImages=[];
+renderPacks();
 function modal(h){
  const isProfile=String(h).includes('<h2>Your profile</h2>');
  $('mod').innerHTML='<div class="ov '+(isProfile?'profile-overlay':'')+'" onclick="if(event.target===this)closeM()"><div class="mod '+(isProfile?'profile-view':'')+'" role="dialog" aria-modal="true">'+h+'</div></div>';
@@ -1154,6 +1155,7 @@ function legalOpen(kind){const docs={privacy:['Privacy Policy','Vaani stores acc
 
 $('sb').onclick=send;
 $('in').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const modalRoot=$('mod');if(modalRoot?.firstElementChild){closeM();return}const side=$('side');if(side?.classList.contains('open')){closeSidebar();document.querySelector('#app .top .menu')?.focus()}});
 $('in').addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=e.target.scrollHeight+'px'});
 </script>
 </body>
