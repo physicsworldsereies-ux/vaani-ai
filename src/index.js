@@ -395,8 +395,11 @@ export default {
           const result=await sb.auth.getSession();
           if(!result.data.session){authOpen();return;}
           await enter(result.data.session);
-          if(prof&&prof.is_admin){await adminOpen();}
-          else{history.replaceState({}, "", "/");toast("Admin access required.");}
+          if(prof&&prof.is_admin){
+            $("app").classList.add("hide");
+            $("land").classList.add("hide");
+            await adminOpen();
+          }else{history.replaceState({}, "", "/");toast("Admin access required.");}
         }catch(e){history.replaceState({}, "", "/");toast("Could not open admin panel.");}
       });
     </script>`;
