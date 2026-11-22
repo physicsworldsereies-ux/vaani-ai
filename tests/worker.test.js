@@ -17,4 +17,14 @@ describe("Vaani Worker",()=>{
  it("rejects oversized request bodies",async()=>{const req=new Request("https://site/api/chat",{method:"POST",headers:{"content-type":"application/json","content-length":"20000"},body:"x"});await expect(readBody(req,16384)).rejects.toMatchObject({status:413})});
  it("requires authentication for admin actions",async()=>{vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response("{}",{status:401})));const r=await worker.fetch(new Request("https://site/api",{method:"POST",headers:{authorization:"Bearer invalid","content-type":"application/json"},body:JSON.stringify({action:"admin-credit",user_id:"not-a-uuid",amount:-1})}),env,{});expect(r.status).toBe(401)});
 
+
+  it("saves admin settings in one validated upsert batch", async () => {
+    const source = readFileSync(new URL("../src/index.js", import.meta.url), "utf8");
+    expect(source).toContain('if(action==="admin-settings-batch")');
+    expect(source).toContain("Array.isArray(body.values)");
+    expect(source).toContain("seen.has(key)");
+    expect(source).toContain('"/rest/v1/app_settings?on_conflict=key"');
+    expect(source).toContain("resolution=merge-duplicates,return=minimal");
+  });
+
 });
