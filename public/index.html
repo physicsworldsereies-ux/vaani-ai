@@ -738,8 +738,18 @@ async function showChatForSession(session){
   return chatHandoff;
 }
 sb.auth.onAuthStateChange((ev,session)=>{
-  if(session&&!user){void showChatForSession(session)}
-  else if(!session){
+  // Supabase invokes this callback while its auth lock is held. Defer app work
+  // so profile/chat queries cannot contend with the session lock.
+  if(session){
+    if(!user&&(ev==='INITIAL_SESSION'||ev==='SIGNED_IN'||ev==='TOKEN_REFRESHED'||ev==='USER_UPDATED')){
+      queueMicrotask(()=>{if(!user)void showChatForSession(session)});
+    }
+    return;
+  }
+  // A null session can be emitted during initial boot. Only a real sign-out
+  // event should clear the authenticated UI.
+  if(ev!=='SIGNED_OUT')return;
+  queueMicrotask(()=>{
     document.documentElement.classList.remove('direct-chat','auth-pending');
     user=null;prof=null;chats=[];cur=null;entering=false;chatHandoff=null;
     $('side').classList.remove('open','profile-open');
@@ -752,7 +762,7 @@ sb.auth.onAuthStateChange((ev,session)=>{
     $('auth-loader').classList.add('hide');
     closeM();
     window.scrollTo(0,0);
-  }
+  });
 });
 /* Resolve the saved session before revealing either homepage or chat. */
 (async function bootAuth(){
