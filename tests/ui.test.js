@@ -18,22 +18,30 @@ describe("Vaani chat UI", () => {
     }
   });
 
-  it("always opens the sidebar when leaving history full-chat mode, even with stale open state", () => {
+  it("uses one explicit sidebar controller for open, close and accessibility state", () => {
     for (const path of ["../index.html", "../public/index.html"]) {
       const html = readFileSync(new URL(path, import.meta.url), "utf8");
-      const start = html.indexOf("function toggleSidebar(event)");
-      const end = html.indexOf("function syncResponsiveLayout()", start);
-      expect(start).toBeGreaterThanOrEqual(0);
-      expect(end).toBeGreaterThan(start);
-      const toggle = html.slice(start, end);
-      expect(toggle).toContain("const wasFullChat=app.classList.contains('full-chat')");
-      expect(toggle).toContain("const opening=wasFullChat||!side.classList.contains('open')");
-      expect(toggle.indexOf("app.classList.remove('full-chat')")).toBeLessThan(toggle.indexOf("const opening="));
-      expect(toggle).toContain("app.classList.toggle('sidebar-open',opening)");
-      expect(toggle).not.toContain("style.setProperty('transform'");
-      expect(toggle).toContain("aria-expanded");
-      expect(toggle).toContain("aria-pressed");
+      expect(html).toContain('id="sideCloseBtn"');
+      expect(html).toContain('onclick="closeSidebar(event)"');
+      expect(html).toContain("function syncSidebarControls()");
+      expect(html).toContain("function setSidebarOpen(open)");
+      expect(html).toContain("function toggleSidebar(event)");
+      expect(html).toContain("function closeSidebar(event)");
+      expect(html).toContain("side.inert=hidden");
+      expect(html).toContain("app.classList.toggle('sidebar-open',drawerOpen)");
+      expect(html).toContain("side.classList.toggle('open',drawerOpen)");
+      expect(html).toContain("#app.sidebar-open .sidebar-scrim");
+      expect(html).toContain("pointer-events:auto!important");
     }
+  });
+
+  it("keeps history selection, New Chat and full-chat mode synchronized with sidebar state", () => {
+    const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+    expect(html).toContain("profileClose();setSidebarOpen(false)");
+    expect(html).toContain("app.classList.toggle('full-chat',full)");
+    expect(html).toContain("setSidebarOpen(false);");
+    expect(html).toContain("function newChat(){");
+    expect(html).toContain("side.setAttribute('aria-hidden',String(hidden))");
   });
 
   it("keeps desktop sidebar persistent and uses a backdrop drawer on mobile", () => {
