@@ -4,7 +4,7 @@ compatibility_date = "2026-10-26"
 
 [vars]
 SUPABASE_URL = "https://voohqnqyspxdlyaqygof.supabase.co"
-ALLOWED_ORIGIN = "https://vaani-ai.radhadevi05051980.workers.dev"
+ALLOWED_ORIGIN = "https://vaani-ai.vidyapagesdev.workers.dev"
 
 [assets]
 directory = "./public"
