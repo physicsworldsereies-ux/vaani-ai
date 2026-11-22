@@ -48,8 +48,8 @@ describe("Vaani chat UI", () => {
   it("only renders the profile admin shortcut for an active authorized admin profile", () => {
     const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
     expect(html).toContain("prof&&prof.is_admin===true&&!prof.is_banned");
-    expect(html).toContain("id=\\"profilePanel\\"");
-    expect(html).toContain("onclick=\\"adminOpen()\\"");
+    expect(html).toContain("id=\"profilePanel\"");
+    expect(html).toContain("onclick=\"adminOpen()\"");
     expect(html).toContain("Admin dashboard");
   });
 
