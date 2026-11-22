@@ -547,6 +547,32 @@ html,body{width:100%;max-width:100%;min-width:0;overflow-x:hidden}
  #app .sidebar-scrim{display:none!important}
 }
 @media(prefers-reduced-motion:reduce){#app>aside{transition:none!important}}
+
+/* Functional sidebar contract: one predictable mobile drawer and desktop rail. */
+#app{position:relative;isolation:isolate}
+#app>main{position:relative;z-index:1;min-width:0}
+#app>aside .side-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex:0 0 auto;min-width:0}
+#app>aside .side-head .logo{min-width:0}
+#app>aside .side-close{display:none;flex:0 0 38px;width:38px;height:38px}
+#app .sidebar-scrim{display:none;pointer-events:none}
+@media(max-width:820px){
+ #app{position:relative!important;overflow:hidden!important}
+ #app>main{z-index:1!important}
+ #app>aside{position:absolute!important;inset:0 auto 0 0!important;width:min(82vw,300px)!important;max-width:300px!important;height:100%!important;max-height:100%!important;z-index:30!important;transform:translateX(-105%)!important;visibility:hidden!important;pointer-events:none!important;transition:transform .22s ease,visibility .22s ease!important;box-shadow:12px 0 40px #0008!important}
+ #app>aside.open{transform:translateX(0)!important;visibility:visible!important;pointer-events:auto!important;display:flex!important}
+ #app .sidebar-scrim{display:none;position:absolute!important;inset:0!important;z-index:20!important;width:100%!important;height:100%!important;border:0!important;padding:0!important;background:rgba(0,0,0,.62)!important;pointer-events:none!important}
+ #app.sidebar-open .sidebar-scrim{display:block!important;pointer-events:auto!important}
+ #app>aside .side-close{display:grid!important;place-items:center}
+ #app .top .menu{position:relative;z-index:2;display:grid!important;pointer-events:auto!important}
+ #app>aside.profile-open{z-index:31!important}
+}
+@media(min-width:821px){
+ #app{position:relative!important}
+ #app>aside{position:relative!important;inset:auto!important;transform:none!important;visibility:visible!important;pointer-events:auto!important;z-index:2!important;width:auto!important;max-width:none!important;height:auto!important}
+ #app .sidebar-scrim{display:none!important;pointer-events:none!important}
+ #app>aside .side-close{display:none!important}
+}
+
 /* Site-wide responsive finishing layer: landing, chat, overlays and admin. */
 html{width:100%;max-width:100%;overflow-x:clip}
 body{width:100%;min-width:320px;max-width:100%;overflow-x:clip}
@@ -685,11 +711,11 @@ input,select,textarea{max-width:100%;min-width:0}
 </div>
 
 <div id="app" class="hide">
-<aside id="side"><div class="logo"><span class="dot"></span>Vaani</div>
+<aside id="side" aria-label="Main navigation" aria-hidden="true" inert><div class="side-head"><div class="logo"><span class="dot"></span>Vaani</div><button type="button" class="ic side-close" id="sideCloseBtn" aria-label="Close sidebar" title="Close sidebar" onclick="closeSidebar(event)">×</button></div>
 <button class="btn ghost" onclick="newChat()">+ New chat</button><button class="btn ghost hide" id="adminBtn" onclick="adminOpen()">⚙ Admin panel</button>
 <div class="hist" id="hist"></div>
 <div class="cred"><div><span class="small">Credits left</span><br><b id="cr">50</b></div><button class="btn pri" style="padding:.5rem .9rem" onclick="buyOpen()">Top up</button></div>
-<button class="me" onclick="profOpen()"><span class="av" id="av">D</span><span><b id="nm">Demo User</b><br><span class="small">Profile</span></span></button><section id="profilePanel" aria-label="Account profile"></section></aside><button type="button" class="sidebar-scrim" aria-label="Close sidebar" onclick="toggleSidebar()"></button>
+<button class="me" onclick="profOpen()"><span class="av" id="av">D</span><span><b id="nm">Demo User</b><br><span class="small">Profile</span></span></button><section id="profilePanel" aria-label="Account profile"></section></aside><button type="button" class="sidebar-scrim" aria-label="Close sidebar" aria-hidden="true" tabindex="-1" onclick="closeSidebar(event)"></button>
 <main><div class="top"><button type="button" class="ic menu" onclick="toggleSidebar()" aria-controls="side" aria-expanded="false" aria-label="Open sidebar">☰</button><b id="ct">New chat</b><button type="button" class="ic expand-chat" id="expandChatBtn" onclick="toggleFullChat()" title="Full chat screen" aria-label="Expand chat" aria-pressed="false">⛶</button></div>
 <div id="msgs"><div class="col" id="col"></div></div>
 <div class="comp"><div id="imagePreview" class="image-preview"></div><div class="box"><div class="attach-tools"><button class="ic" aria-label="Choose image from gallery" title="Gallery" onclick="$('galleryInput').click()">▧</button><button class="ic" aria-label="Take a photo" title="Camera" onclick="$('cameraInput').click()">📷</button></div><input id="galleryInput" type="file" accept="image/*" multiple hidden onchange="pickImages(this)"><input id="cameraInput" type="file" accept="image/*" capture="environment" hidden onchange="pickImages(this)">
@@ -769,23 +795,47 @@ async function signIn(){
   toast('Login failed: '+(e.message||'Please try again'));
  }
 }
+function syncSidebarControls(){
+ const app=$('app'),side=$('side'),menu=document.querySelector('#app .top .menu');
+ if(!app||!side)return;
+ const mobile=document.documentElement.classList.contains('mobile-layout')||window.matchMedia('(max-width: 820px)').matches;
+ const drawerOpen=mobile&&side.classList.contains('open')&&app.classList.contains('sidebar-open');
+ const hidden=mobile?!drawerOpen:app.classList.contains('full-chat');
+ side.inert=hidden;
+ side.setAttribute('aria-hidden',String(hidden));
+ const scrim=app.querySelector('.sidebar-scrim');
+ if(scrim){scrim.setAttribute('aria-hidden',String(!drawerOpen));scrim.tabIndex=drawerOpen?0:-1}
+ if(menu){menu.setAttribute('aria-expanded',String(drawerOpen));menu.setAttribute('aria-label',drawerOpen?'Close sidebar':'Open sidebar')}
+ const close=$('sideCloseBtn');
+ if(close)close.setAttribute('aria-hidden',String(!drawerOpen));
+}
+function setSidebarOpen(open){
+ const app=$('app'),side=$('side');
+ if(!app||!side)return false;
+ if(open)app.classList.remove('full-chat');
+ const mobile=document.documentElement.classList.contains('mobile-layout')||window.matchMedia('(max-width: 820px)').matches;
+ const drawerOpen=mobile&&Boolean(open);
+ side.classList.toggle('open',drawerOpen);
+ app.classList.toggle('sidebar-open',drawerOpen);
+ syncSidebarControls();
+ const expand=$('expandChatBtn');
+ if(expand&&!app.classList.contains('full-chat')){
+  expand.textContent='⛶';expand.title='Full chat screen';
+  expand.setAttribute('aria-label','Expand chat');expand.setAttribute('aria-pressed','false');
+ }
+ return drawerOpen;
+}
 function toggleSidebar(event){
- const app=$('app'),side=$('side'),btn=document.querySelector('#app .top .menu');
  if(event){event.preventDefault();event.stopPropagation()}
+ const app=$('app'),side=$('side');
  if(!app||!side)return;
  const wasFullChat=app.classList.contains('full-chat');
- app.classList.remove('full-chat');
  const opening=wasFullChat||!side.classList.contains('open');
- side.classList.toggle('open',opening);
- app.classList.toggle('sidebar-open',opening);
- const expand=$('expandChatBtn');
- if(expand){
-  expand.textContent='⛶';
-  expand.title='Full chat screen';
-  expand.setAttribute('aria-label','Expand chat');
-  expand.setAttribute('aria-pressed','false');
- }
- if(btn){btn.setAttribute('aria-expanded',String(opening));btn.setAttribute('aria-label',opening?'Close sidebar':'Open sidebar');}
+ setSidebarOpen(opening);
+}
+function closeSidebar(event){
+ if(event){event.preventDefault();event.stopPropagation()}
+ setSidebarOpen(false);
 }
 function syncResponsiveLayout(){
  const root=document.documentElement;
@@ -800,6 +850,7 @@ function syncResponsiveLayout(){
  document.body?.classList.toggle('mobile-layout',mobile);
  const app=$('app'),side=$('side');
  if(!mobile&&side){side.classList.remove('open');app?.classList.remove('sidebar-open')}
+ syncSidebarControls();
 }
 function settleResponsiveLayout(){
  return new Promise(resolve=>{
@@ -820,7 +871,7 @@ async function enter(session){
  // Reset transient chat/sidebar state on every fresh authenticated session.
  // A prior full-chat toggle must not hide the sidebar after sign-out/sign-in.
  $('app').classList.remove('full-chat');
- $('side').classList.remove('open');
+ setSidebarOpen(false);
  syncResponsiveLayout();
  entering=true;
  try{
@@ -982,15 +1033,24 @@ function profOpen(){
 }
 function profileClose(){$('side').classList.remove('profile-open');$('profilePanel').innerHTML=''}
 function toggleFullChat(){
- const app=$('app'),side=$('side'),btn=$('expandChatBtn');
- const full=app.classList.toggle('full-chat');
- side.classList.remove('open');app.classList.remove('sidebar-open');
- btn.textContent=full?'⤢':'⛶';
- btn.title=full?'Show sidebar':'Full chat screen';
- btn.setAttribute('aria-label',full?'Show sidebar':'Expand chat');
- btn.setAttribute('aria-pressed',String(full));
+ const app=$('app'),btn=$('expandChatBtn');
+ if(!app)return;
+ const full=!app.classList.contains('full-chat');
+ setSidebarOpen(false);
+ app.classList.toggle('full-chat',full);
+ syncSidebarControls();
+ if(btn){
+  btn.textContent=full?'⤢':'⛶';
+  btn.title=full?'Show sidebar':'Full chat screen';
+  btn.setAttribute('aria-label',full?'Show sidebar':'Expand chat');
+  btn.setAttribute('aria-pressed',String(full));
+ }
 }
-function newChat(){const app=$('app'),side=$('side');app.classList.remove('full-chat','sidebar-open');profileClose();cur={id:null,t:'New chat',m:[]};$('in').value='';pendingImages=[];showImagePreview();draw();side.classList.remove('open');const menu=document.querySelector('#app .top .menu');if(menu){menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open sidebar')}}
+function newChat(){
+ const app=$('app');if(!app)return;
+ app.classList.remove('full-chat');profileClose();setSidebarOpen(false);
+ cur={id:null,t:'New chat',m:[]};$('in').value='';pendingImages=[];showImagePreview();draw();
+}
 async function open_(id){
  const selected=chats.find(c=>c.id===id);if(!selected)return;
  cur=selected;
@@ -1001,8 +1061,8 @@ async function open_(id){
    cur.m=(r.data||[]).map(x=>({r:x.role==='user'?'u':'b',x:x.content}));
   }
   draw();
-  $('app').classList.add('full-chat');$('app').classList.remove('sidebar-open');
-  $('side').classList.remove('open','profile-open');
+  profileClose();setSidebarOpen(false);
+  $('app').classList.add('full-chat');syncSidebarControls();
   const btn=$('expandChatBtn');if(btn){btn.textContent='⤢';btn.title='Show sidebar';btn.setAttribute('aria-label','Show sidebar');btn.setAttribute('aria-pressed','true')}
   const menu=document.querySelector('#app .top .menu');if(menu){menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open sidebar')}
  }catch(e){toast('Could not open this chat: '+(e.message||'Please retry'))}
