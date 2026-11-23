@@ -944,15 +944,24 @@ async function showChatForSession(session){
     document.documentElement.classList.add('auth-pending','direct-chat');
     $('land').classList.add('hide');
     syncResponsiveLayout();
-    if(!user) await enter(session);
+    // enter() renders the authenticated shell synchronously before its first
+    // profile/history await. Release the blocking loader as soon as that shell
+    // has had a paint; do not make OAuth navigation depend on database latency.
+    const enterTask=!user ? enter(session) : Promise.resolve();
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    if(user){
+      $('land').classList.add('hide');
+      $('app').classList.remove('hide');
+    }
+    $('auth-loader').classList.add('hide');
+    document.documentElement.classList.remove('auth-pending');
+    await enterTask;
     while(entering) await new Promise(resolve=>setTimeout(resolve,20));
     if(user){
       $('land').classList.add('hide');
       $('app').classList.remove('hide');
     }
     await settleResponsiveLayout();
-    $('auth-loader').classList.add('hide');
-    document.documentElement.classList.remove('auth-pending');
   })().catch(e=>{
     console.error('auth_handoff_error',String(e?.message||e||'unknown').slice(0,200));
     $('auth-loader').classList.add('hide');
