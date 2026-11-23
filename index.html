@@ -882,17 +882,38 @@ async function enter(session){
  entering=true;
  try{
   user=session.user;
-  const {data}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
-  prof=data||{credits:0,full_name:null,email:user.email,avatar_url:null};
-  if(prof.is_banned){await sb.auth.signOut();toast('This account is blocked. Contact support.');return}
+  // Render the authenticated shell first. A slow or unavailable profile/history
+  // query must never keep the user trapped on the post-Google-login loader.
+  prof={credits:0,full_name:null,email:user.email,avatar_url:null,is_admin:false};
+  const initialName=(user.email||'You').split('@')[0];
+  $('nm').textContent=initialName;$('av').textContent=(initialName[0]||'U').toUpperCase();
+  $('cr').textContent='0';$('adminBtn').classList.add('hide');
+  closeM();$('land').classList.add('hide');$('app').classList.remove('hide');
+  chats=[];newChat();
+  // Supabase requests can otherwise remain pending indefinitely on mobile OAuth
+  // redirects. Bound each request so the handoff always completes.
+  const withTimeout=(request,label)=>Promise.race([
+   request,
+   new Promise((_,reject)=>setTimeout(()=>reject(new Error(label+'_timeout')),7000))
+  ]);
+  const profileResult=await withTimeout(
+   sb.from('profiles').select('*').eq('id',user.id).maybeSingle(),
+   'profile_load'
+  );
+  const profile=profileResult.data;
+  if(profile){
+   prof=profile;
+   if(prof.is_banned){await sb.auth.signOut();toast('This account is blocked. Contact support.');return}
+  }
   const nm=prof.full_name||(user.email||'You').split('@')[0];
-  $('nm').textContent=nm;$('av').textContent=nm[0].toUpperCase();
+  $('nm').textContent=nm;$('av').textContent=(nm[0]||'U').toUpperCase();
   if(prof.avatar_url){$('av').textContent='';$('av').style.backgroundImage='url('+JSON.stringify(prof.avatar_url)+')';$('av').style.backgroundSize='cover'}
   $('cr').textContent=prof.credits??0;$('adminBtn').classList.toggle('hide',!prof.is_admin);
-  closeM();$('land').classList.add('hide');$('app').classList.remove('hide');
-  const r=await sb.from('chats').select('id,title').order('updated_at',{ascending:false});
+  const r=await withTimeout(
+   sb.from('chats').select('id,title').order('updated_at',{ascending:false}),
+   'chat_history_load'
+  );
   chats=(r.data||[]).map(c=>({id:c.id,t:c.title,m:null}));
-  newChat();
  }catch(e){
   toast('Account data could not fully load. You can still open your chat; refresh in a moment if needed.');
   /* An authenticated user must never be sent back to the marketing homepage because a profile/history request failed. */
