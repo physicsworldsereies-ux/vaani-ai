@@ -91,6 +91,7 @@ main{display:flex;flex-direction:column;min-height:0;position:relative}
 textarea{flex:1;background:none;border:0;color:var(--tx);font:inherit;resize:none;padding:.5rem;max-height:160px;outline:0}
 .ic{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:var(--mut)}.ic:hover{background:var(--bg2);color:var(--tx)}
 .send{background:var(--acc);color:var(--onacc)}
+.send:disabled{opacity:.55;cursor:wait}.retry-response{display:inline-flex;align-items:center;gap:.35rem;margin-top:.7rem;padding:.4rem .75rem;border:1px solid var(--line);border-radius:999px;color:var(--acc2);font:inherit;font-size:.85rem}.retry-response:hover{background:var(--bg2)}.chat-error{margin-top:.6rem;color:var(--mut);font-size:.9rem;overflow-wrap:anywhere}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:.7rem 1.1rem;border-radius:10px;z-index:30;animation:pop .25s}
 .row{display:flex;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--line);color:var(--mut)}.row b{color:var(--tx)}
 @media(max-width:820px){.hero{grid-template-columns:1fr}
@@ -1071,7 +1072,7 @@ async function open_(id){
 function draw(){
  $('hist').innerHTML='<small>History</small>'+chats.map(c=>`<div class="hist-row ${cur&&c.id===cur.id?'active':''}"><button class="hist-open" title="${esc(c.t)}" onclick="open_('${c.id}')">${esc(c.t)}</button><button class="hist-delete" title="Delete chat" aria-label="Delete chat: ${esc(c.t)}" onclick="deleteChat('${c.id}',event)">×</button></div>`).join('');
  $('ct').textContent=cur.t;
- $('col').innerHTML=cur.m.length?cur.m.map(row).join(''):`<div class="empty"><h2>What can I help with?</h2><div class="sug">${['Summarise a long article','Plan a 3-day trip','Fix my resume','Explain a tough topic'].map(s=>`<button onclick="ask('${s}')">${s}</button>`).join('')}</div></div>`;
+ $('col').innerHTML=cur.m.length?cur.m.map((m,i)=>row(m,i)).join(''):`<div class="empty"><h2>What can I help with?</h2><div class="sug">${['Summarise a long article','Plan a 3-day trip','Fix my resume','Explain a tough topic'].map(s=>`<button onclick="ask('${s}')">${s}</button>`).join('')}</div></div>`;
  typesetMath();$('msgs').scrollTop=1e9}
 async function deleteChat(id,event){
  if(event)event.stopPropagation();
@@ -1081,8 +1082,18 @@ async function deleteChat(id,event){
  try{await api('delete-chat',{chat_id:id});chats=chats.filter(c=>c.id!==id);if(cur&&cur.id===id)newChat();else draw();toast('Chat deleted.');}
  catch(e){toast('Could not delete chat: '+(e.message||'Please try again'))}
 }
-const row=m=>`<div class="m ${m.r==='b'?'bot':''}">${m.r==='b'?'<span class="av" aria-hidden="true">V</span>':''}<div class="t">${m.r==='b'?formatReply(m.x):(m.imgs&&m.imgs.length?'<div class="sent-images">'+imageMarkup(m.imgs)+'</div>':'')+esc(m.x)}</div></div>`;
+const row=(m,index)=>`<div class="m ${m.r==='b'?'bot':''}">${m.r==='b'?'<span class="av" aria-hidden="true">V</span>':''}<div class="t">${m.r==='b'?formatReply(m.x):(m.imgs&&m.imgs.length?'<div class="sent-images">'+imageMarkup(m.imgs)+'</div>':'')+esc(m.x)}${m.r==='b'&&m.failed?'<div class="chat-error" role="alert">'+esc(m.failed)+'</div><button class="retry-response" type="button" onclick="retryMessage('+index+')">↻ Retry response</button>':''}</div></div>`;
+async function retryMessage(index){
+ const chat=cur,failed=chat?.m[index],previous=chat?.m[index-1];
+ if(busy||!failed?.failed||previous?.r!=='u')return;
+ if($('in').value.trim()||pendingImages.length){toast('Send or clear your current draft before retrying.');return}
+ const text=previous.x||'',images=(previous.imgs||[]).slice();
+ chat.m.splice(index-1,2);
+ $('in').value=text;pendingImages=images;showImagePreview();
+ await send();
+}
 function ask(t){$('in').value=t;send()}
+function setComposerBusy(value){busy=value;$('sb').disabled=value;$('sb').setAttribute('aria-busy',String(value));$('sb').title=value?'Vaani is responding':'Send message'}
 async function send(){
  const v=$('in').value.trim(),imgs=pendingImages.slice();
  if((!v&&!imgs.length)||busy)return;
@@ -1090,7 +1101,7 @@ async function send(){
  if(Number(prof?.credits??0)<1){buyOpen();return}
  const chat=cur;if(!chat)return;
  const prompt=v||'Please describe and help me with the attached image.';
- pendingImages=[];showImagePreview();busy=true;$('in').value='';
+ pendingImages=[];showImagePreview();setComposerBusy(true);$('in').value='';
  const prior=chat.id;
  chat.m.push({r:'u',x:v,imgs});
  const b={r:'b',x:''};chat.m.push(b);draw();
@@ -1130,12 +1141,11 @@ async function send(){
   if(cur===chat)draw();
  }catch(e){
   const message=String(e?.message||'AI request failed');
-  const answerIndex=chat.m.indexOf(b);if(answerIndex>=0)chat.m.splice(answerIndex,1);
-  const userIndex=chat.m.findIndex(m=>m.r==='u'&&m.x===v&&m.imgs===imgs);if(userIndex>=0)chat.m.splice(userIndex,1);
+  b.failed=message;
   if(cur===chat)draw();
-  const M={no_credits:'Your credits are finished. Please top up.',banned:'This account is blocked.',maintenance:'We are under maintenance. Please try again shortly.',unauthorized:'Please sign in again.',rate_limited:'Too many requests. Please wait a moment.',ai_not_configured:'AI provider is not configured on the server.',ai_auth_error:'AI provider rejected the server API key. Check the Gemini key and API access.',ai_model_unavailable:'The selected Gemini model is unavailable. Choose a supported model in Admin settings.',ai_rate_limited:'Gemini is rate-limiting requests. Wait briefly and retry.',database_error:'The AI replied, but saving chat/credits failed. Please retry shortly.',empty_reply:'The AI returned an empty response. Please retry.',chat_not_found:'This chat could not be found. Start a new chat.',ai_error:'The AI service failed. Please retry shortly.'};
+  const M={no_credits:'Your credits are finished. Please top up.',banned:'This account is blocked.',maintenance:'We are under maintenance. Please try again shortly.',unauthorized:'Please sign in again.',rate_limited:'Too many requests. Please wait a moment.',ai_not_configured:'AI provider is not configured on the server.',ai_auth_error:'AI provider rejected the server API key. Check the Gemini key and API access.',ai_model_unavailable:'The selected Gemini model is unavailable. Choose a supported model in Admin settings.',ai_rate_limited:'Gemini is rate-limiting requests. Wait briefly and retry.',database_error:'The AI replied, but saving chat/credits failed. Please retry shortly.',empty_reply:'The AI returned an empty response. Please retry.',chat_not_found:'This chat could not be found. Start a new chat.',ai_error:'The AI service failed. Please retry shortly.',model_setting_missing:'The AI model is not configured. Please contact the administrator.',bad_message:'Your message or attachment is invalid. Please check and try again.',bad_request:'The request could not be read. Please retry.',body_too_large:'The message or image is too large. Please attach a smaller image.',invalid_image:'This image format is not supported. Use JPEG, PNG or WebP.',images_too_large:'Your attached images are too large. Please use smaller images.',no_profile:'Your account profile is not ready. Please sign in again.',chat_save_failed:'The conversation could not be created. Your message is saved here; retry when ready.'};
   toast(M[message]||message||'AI request failed');
- }finally{busy=false}
+ }finally{setComposerBusy(false)}
 }
 
 async function adminOpen(){
