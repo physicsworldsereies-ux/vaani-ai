@@ -687,6 +687,11 @@ input,select,textarea{max-width:100%;min-width:0}
  #mod .mod{max-height:96dvh}
 }
 @media (prefers-reduced-motion:reduce){#land *,#app *,#mod *{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* Site-wide diagnostic panel: show actionable errors instead of silent failures. */
+#diagnostic-panel{position:fixed;z-index:100000;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));max-width:760px;margin:auto;background:#171717;color:#f5f5f5;border:1px solid #a33;border-radius:14px;box-shadow:0 12px 40px #0009;padding:14px;font:13px/1.45 system-ui,sans-serif;max-height:45dvh;overflow:auto}
+#diagnostic-panel[hidden]{display:none!important}#diagnostic-panel .diag-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}#diagnostic-panel .diag-title{font-weight:700;color:#ffb4a9}#diagnostic-panel .diag-actions{display:flex;gap:8px;flex-wrap:wrap}#diagnostic-panel button{background:#303030;color:#fff;border:1px solid #666;border-radius:8px;padding:6px 10px;font:inherit}#diagnostic-panel .diag-row{margin-top:5px;overflow-wrap:anywhere}#diagnostic-panel .diag-label{color:#aaa}#diagnostic-panel code{color:#ffe08a;white-space:pre-wrap;overflow-wrap:anywhere}#diagnostic-panel .diag-help{color:#c9c9c9;margin-top:8px}
+
 </style>
 </head>
 <body>
@@ -750,7 +755,28 @@ function modal(h){
  $('mod').innerHTML='<div class="ov '+(isProfile?'profile-overlay':'')+'" onclick="if(event.target===this)closeM()"><div class="mod '+(isProfile?'profile-view':'')+'" role="dialog" aria-modal="true">'+h+'</div></div>';
 }
 function closeM(){$('mod').innerHTML=''}
+function diagnosticSafe(value){return String(value??'Unknown error').replace(/Bearer\s+[A-Za-z0-9._~+\/-]+=*/gi,'Bearer [redacted]').replace(/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,'[token redacted]').replace(/(api[_-]?key|apikey|secret|password)(\s*[:=]\s*)[^\s,;]+/gi,'$1$2[redacted]').replace(/[\u0000-\u001f]/g,' ').slice(0,700)}
+let diagnosticItems=[];
+function reportDiagnostic(area,error,extra={}){
+ const message=diagnosticSafe(error?.message||error?.details||error||'Unknown error');
+ const code=diagnosticSafe(error?.code||error?.status||extra.code||'CLIENT_ERROR');
+ const item={area:diagnosticSafe(area),message,code,time:new Date().toLocaleString(),hint:diagnosticSafe(error?.hint||extra.hint||'')};
+ diagnosticItems.unshift(item);diagnosticItems=diagnosticItems.slice(0,5);
+ let panel=document.getElementById('diagnostic-panel');
+ if(!panel){panel=document.createElement('section');panel.id='diagnostic-panel';panel.setAttribute('role','alert');panel.setAttribute('aria-live','assertive');document.body.append(panel)}
+ panel.replaceChildren();
+ const head=document.createElement('div');head.className='diag-head';
+ const title=document.createElement('div');title.className='diag-title';title.textContent='Vaani diagnostic — an error occurred';head.append(title);
+ const actions=document.createElement('div');actions.className='diag-actions';
+ const copy=document.createElement('button');copy.type='button';copy.textContent='Copy details';copy.onclick=()=>{const text=diagnosticItems.map(x=>x.time+' | '+x.area+' | '+x.code+' | '+x.message+(x.hint?' | '+x.hint:'')).join('\n');if(navigator.clipboard?.writeText)navigator.clipboard.writeText(text).then(()=>{copy.textContent='Copied'}).catch(()=>{copy.textContent='Copy unavailable'});else copy.textContent='Copy unavailable'};
+ const close=document.createElement('button');close.type='button';close.textContent='Dismiss';close.onclick=()=>{panel.hidden=true};actions.append(copy,close);head.append(actions);panel.append(head);
+ for(const x of diagnosticItems){const row=document.createElement('div');row.className='diag-row';const label=document.createElement('span');label.className='diag-label';label.textContent=x.time+' · '+x.area+' · ';const value=document.createElement('code');value.textContent=x.code+' — '+x.message;row.append(label,value);if(x.hint){const hint=document.createElement('div');hint.className='diag-help';hint.textContent='Hint: '+x.hint;row.append(hint)}panel.append(row)}
+ panel.hidden=false;
+ console.error('[Vaani diagnostic]',item);
+}
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),2800)}
+window.addEventListener('error',event=>reportDiagnostic('Browser JavaScript',event.message||'Script error',{code:'JAVASCRIPT_ERROR',hint:(event.filename?event.filename.split('/').pop():'')+(event.lineno?':'+event.lineno:'')}));
+window.addEventListener('unhandledrejection',event=>reportDiagnostic('Unhandled async operation',event.reason||'Promise rejected',{code:'UNHANDLED_REJECTION'}));
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function imageMarkup(images){return (images||[]).map(x=>'<img alt="Attached image" src="data:'+esc(x.mime_type)+';base64,'+x.data+'">').join('')}
 function showImagePreview(){$('imagePreview').innerHTML=pendingImages.map((x,i)=>'<div class="image-chip"><img alt="Image preview" src="data:'+x.mime_type+';base64,'+x.data+'"><button type="button" aria-label="Remove image" onclick="removeImage('+i+')">×</button></div>').join('')}
@@ -781,7 +807,7 @@ function formatReply(value){
  return out.join('');
 }
 function typesetMath(){const target=$('col');if(window.MathJax&&MathJax.typesetPromise){MathJax.typesetClear?.([target]);MathJax.typesetPromise([target]).catch(()=>{});}}
-async function loadPacks(){try{const {data,error}=await sb.from('credit_packs').select('id,name,credits,price_paise,is_popular').eq('active',true).order('sort');if(!error&&data&&data.length){PACKS=data.map(d=>({id:d.id,name:d.name,c:d.credits,p:d.price_paise/100,b:d.is_popular}));renderPacks()}}catch(e){}}
+async function loadPacks(){try{const {data,error}=await sb.from('credit_packs').select('id,name,credits,price_paise,is_popular').eq('active',true).order('sort');if(error)throw error;if(data&&data.length){PACKS=data.map(d=>({id:d.id,name:d.name,c:d.credits,p:d.price_paise/100,b:d.is_popular}));renderPacks()}}catch(e){reportDiagnostic('Credit packs',e,{hint:'Check Supabase credit_packs table, SELECT policy and database connectivity.'})}}
 loadPacks();
 function authOpen(){modal(`<h2>Welcome to Vaani</h2><p>Sign in to get free credits and save your chats.</p><button class="g" onclick="signIn()"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>Continue with Google</button><p class="small" style="margin:1rem 0 0">By continuing you agree to the Terms and Privacy Policy.</p>`)}
 let signInPending=false;
@@ -796,6 +822,7 @@ async function signIn(){
   const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});
   if(error)throw error;
  }catch(e){
+  reportDiagnostic('Google sign-in',e,{hint:'Check Supabase Google provider settings and the exact OAuth redirect URL.'});
   signInPending=false;
   if(button){button.disabled=false;button.removeAttribute('aria-busy')}
   toast('Login failed: '+(e.message||'Please try again'));
@@ -900,6 +927,7 @@ async function enter(session){
    sb.from('profiles').select('*').eq('id',user.id).maybeSingle(),
    'profile_load'
   );
+  if(profileResult.error)throw Object.assign(new Error(profileResult.error.message||'Profile query failed'),profileResult.error);
   const profile=profileResult.data;
   if(profile){
    prof=profile;
@@ -913,8 +941,10 @@ async function enter(session){
    sb.from('chats').select('id,title').order('updated_at',{ascending:false}),
    'chat_history_load'
   );
+  if(r.error)throw Object.assign(new Error(r.error.message||'Chat history query failed'),r.error);
   chats=(r.data||[]).map(c=>({id:c.id,t:c.title,m:null}));
  }catch(e){
+  reportDiagnostic('Account profile / chat history',e,{hint:'Check Supabase profiles/chats access, RLS policies, network and the 7-second request timeout.'});
   toast('Account data could not fully load. You can still open your chat; refresh in a moment if needed.');
   /* An authenticated user must never be sent back to the marketing homepage because a profile/history request failed. */
   if(session?.user){
@@ -963,6 +993,7 @@ async function showChatForSession(session){
     }
     await settleResponsiveLayout();
   })().catch(e=>{
+    reportDiagnostic('Login handoff',e,{hint:'Check OAuth redirect URL, session restoration and frontend runtime errors.'});
     console.error('auth_handoff_error',String(e?.message||e||'unknown').slice(0,200));
     $('auth-loader').classList.add('hide');
     document.documentElement.classList.remove('auth-pending');
@@ -1025,6 +1056,7 @@ sb.auth.onAuthStateChange((ev,session)=>{
       document.documentElement.classList.remove('auth-pending');
     }
   }catch(e){
+    reportDiagnostic('Session bootstrap',e,{hint:'Check Supabase Auth availability and browser session storage.'});
     $('auth-loader').classList.add('hide');
     $('app').classList.add('hide');$('land').classList.remove('hide');
     document.documentElement.classList.remove('auth-pending');
@@ -1187,6 +1219,7 @@ async function send(){
   if(!b.x)throw new Error('AI returned an empty answer');
   if(cur===chat)draw();
  }catch(e){
+  reportDiagnostic('AI chat request',e,{hint:'Check Worker /api/chat response, Gemini model/key, CORS and Supabase chat/credit writes.'});
   const message=String(e?.message||'AI request failed');
   b.failed=message;
   if(cur===chat)draw();
