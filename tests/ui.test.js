@@ -82,6 +82,16 @@ describe("Vaani chat UI", () => {
     expect(html).toContain("#app .m .t pre");
   });
 
+  it("refreshes credits from the authenticated profile and uses verified checkout balance", () => {
+    const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+    expect(html).toContain('id="refreshCreditsBtn"');
+    expect(html).toContain("async function refreshCredits(showToast=true)");
+    expect(html).toContain("select('credits').eq('id',user.id).single()");
+    expect(html).toContain('id="profileCredits"');
+    expect(html).toContain("result.credits!==null&&result.credits!==undefined");
+    expect(html).toContain("void refreshCredits(false)");
+  });
+
   it("keeps legal content readable without horizontal overflow on phones", () => {
     const css = readFileSync(new URL("../public/legal.css", import.meta.url), "utf8");
     expect(css).toContain("Responsive legal pages");
