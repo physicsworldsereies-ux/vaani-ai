@@ -71,6 +71,7 @@ aside{background:var(--bg2);border-right:1px solid var(--line);display:flex;flex
 .hist button:hover,.hist button.on{background:var(--card);color:var(--tx)}
 .hist small{padding:.4rem .7rem;color:var(--mut);font-size:.8rem}
 .cred{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.7rem .9rem}
+.credit-actions{display:flex;align-items:center;gap:.35rem}.credit-actions .ic{width:34px;height:34px}.credit-actions button:disabled{opacity:.5;cursor:wait}
 .cred b{font-size:1.3rem;font-family:'Bricolage Grotesque',sans-serif;color:var(--acc)}
 .me{display:flex;gap:.7rem;align-items:center;padding:.5rem;border-radius:10px;width:100%;text-align:left}.me:hover{background:var(--card)}
 .av{width:34px;height:34px;border-radius:50%;background:var(--acc2);color:#0b1230;display:grid;place-items:center;font-weight:700;flex:none}
@@ -715,7 +716,7 @@ input,select,textarea{max-width:100%;min-width:0}
 <aside id="side" aria-label="Main navigation" aria-hidden="true" inert><div class="side-head"><div class="logo"><span class="dot"></span>Vaani</div><button type="button" class="ic side-close" id="sideCloseBtn" aria-label="Close sidebar" title="Close sidebar" onclick="closeSidebar(event)">×</button></div>
 <button class="btn ghost" onclick="newChat()">+ New chat</button><button class="btn ghost hide" id="adminBtn" onclick="location.assign('/admin')">⚙ Admin panel</button>
 <div class="hist" id="hist"></div>
-<div class="cred"><div><span class="small">Credits left</span><br><b id="cr">50</b></div><button class="btn pri" style="padding:.5rem .9rem" onclick="buyOpen()">Top up</button></div>
+<div class="cred"><div><span class="small">Credits left</span><br><b id="cr">50</b></div><div class="credit-actions"><button class="ic" type="button" id="refreshCreditsBtn" title="Refresh credit balance" aria-label="Refresh credit balance" onclick="refreshCredits()">↻</button><button class="btn pri" style="padding:.5rem .9rem" onclick="buyOpen()">Top up</button></div></div>
 <button class="me" onclick="profOpen()"><span class="av" id="av">D</span><span><b id="nm">Demo User</b><br><span class="small">Profile</span></span></button><section id="profilePanel" aria-label="Account profile"></section></aside><button type="button" class="sidebar-scrim" aria-label="Close sidebar" aria-hidden="true" tabindex="-1" onclick="closeSidebar(event)"></button>
 <main><div class="top"><button type="button" class="ic menu" onclick="toggleSidebar()" aria-controls="side" aria-expanded="false" aria-label="Open sidebar">☰</button><b id="ct">New chat</b><button type="button" class="ic expand-chat" id="expandChatBtn" onclick="toggleFullChat()" title="Full chat screen" aria-label="Expand chat" aria-pressed="false">⛶</button></div>
 <div id="msgs"><div class="col" id="col"></div></div>
@@ -1024,12 +1025,28 @@ async function out(){
  }
 }
 function buyOpen(){if(!user){authOpen();return}modal(`<h2>Top up credits</h2><p>Secure checkout via Razorpay. Credits are added only after server-side signature verification.</p>`+PACKS.map(k=>`<div class="row"><span><b>${k.c}</b> credits</span><button class="btn ${k.b?'pri':'ghost'}" style="padding:.4rem .9rem" onclick="buy(${Number(k.id)})">₹${Number(k.p).toFixed(2)}</button></div>`).join('')+`<button class="btn ghost" style="width:100%;margin-top:1rem" onclick="closeM()">Close</button>`)}
-async function buy(packId){try{if(!window.Razorpay)throw new Error('Razorpay Checkout failed to load.');const order=await api('create-order',{pack_id:packId});closeM();const checkout=new Razorpay({key:order.key_id,amount:order.amount,currency:order.currency,name:order.name,description:order.description,order_id:order.order_id,prefill:order.prefill,theme:{color:'#ffb547'},handler:async function(response){try{const result=await api('verify-payment',response);const {data}=await sb.from('profiles').select('*').eq('id',user.id).single();if(data)prof=data;$('cr').textContent=prof.credits;toast('Payment verified. Credits updated.');}catch(e){toast('Payment submitted but verification needs attention: '+e.message)}} ,modal:{ondismiss:function(){toast('Checkout closed. If payment succeeded, credits update after verification.')}}});checkout.open()}catch(e){toast(e.message||'Could not start payment')}}
+async function buy(packId){try{if(!window.Razorpay)throw new Error('Razorpay Checkout failed to load.');const order=await api('create-order',{pack_id:packId});closeM();const checkout=new Razorpay({key:order.key_id,amount:order.amount,currency:order.currency,name:order.name,description:order.description,order_id:order.order_id,prefill:order.prefill,theme:{color:'#ffb547'},handler:async function(response){try{const result=await api('verify-payment',response);if(result.credits!==null&&result.credits!==undefined&&Number.isFinite(Number(result.credits))){prof=prof||{};prof.credits=Number(result.credits);$('cr').textContent=String(prof.credits);const pc=$('profileCredits');if(pc)pc.textContent=String(prof.credits);toast('Payment verified. Credits updated.')}else{await refreshCredits(false);toast('Payment verified. Balance refreshed.')}}catch(e){await refreshCredits(false);toast('Payment submitted. If credits are not visible yet, use Refresh balance. '+e.message)}} ,modal:{ondismiss:function(){void refreshCredits(false);toast('Checkout closed. If payment succeeded, your balance will refresh after server verification.')}}});checkout.open()}catch(e){toast(e.message||'Could not start payment')}}
+async function refreshCredits(showToast=true){
+ if(!user){if(showToast)toast('Please sign in to refresh credits.');return false}
+ const btn=$('refreshCreditsBtn');
+ if(btn){btn.disabled=true;btn.setAttribute('aria-busy','true')}
+ try{
+  const {data,error}=await sb.from('profiles').select('credits').eq('id',user.id).single();
+  if(error)throw error;
+  if(!data||!Number.isFinite(Number(data.credits)))throw new Error('Credit balance unavailable');
+  prof=prof||{};prof.credits=Number(data.credits);
+  $('cr').textContent=String(prof.credits);
+  const profileCredits=$('profileCredits');if(profileCredits)profileCredits.textContent=String(prof.credits);
+  if(showToast)toast('Credit balance refreshed.');
+  return true;
+ }catch(e){if(showToast)toast('Could not refresh credits: '+(e.message||'Please retry'));return false}
+ finally{if(btn){btn.disabled=false;btn.removeAttribute('aria-busy')}}
+}
 function profOpen(){
  const side=$('side');
  if(side.classList.contains('profile-open')){profileClose();return}
  const adminEntry=prof&&prof.is_admin===true&&!prof.is_banned?'<button class="btn pri" style="width:100%;margin:.8rem 0" onclick="location.assign('/admin')">♛ Admin dashboard ↗</button>':'';
- $('profilePanel').innerHTML=`<div class="profile-head"><h2>Your profile</h2><button class="ic" aria-label="Close profile" onclick="profileClose()">×</button></div><div class="row"><span>Name</span><b>${esc(prof?.full_name||user?.email?.split('@')[0]||'-')}</b></div><div class="row"><span>Email</span><b>${esc(user?.email||'-')}</b></div><div class="row"><span>Credits</span><b>${prof?.credits??0}</b></div><div class="row"><span>Chats</span><b>${chats.length}</b></div>${adminEntry}<div class="profile-actions"><button class="btn ghost" onclick="profileClose()">Back to chats</button><button class="btn ghost" onclick="out()">Sign out</button></div>`;
+ $('profilePanel').innerHTML=`<div class="profile-head"><h2>Your profile</h2><button class="ic" aria-label="Close profile" onclick="profileClose()">×</button></div><div class="row"><span>Name</span><b>${esc(prof?.full_name||user?.email?.split('@')[0]||'-')}</b></div><div class="row"><span>Email</span><b>${esc(user?.email||'-')}</b></div><div class="row"><span>Credits</span><b id="profileCredits">${prof?.credits??0}</b></div><div class="row"><span>Chats</span><b>${chats.length}</b></div>${adminEntry}<div class="profile-actions"><button class="btn ghost" onclick="profileClose()">Back to chats</button><button class="btn ghost" onclick="out()">Sign out</button></div>`;
  side.classList.add('profile-open');
 }
 function profileClose(){$('side').classList.remove('profile-open');$('profilePanel').innerHTML=''}
