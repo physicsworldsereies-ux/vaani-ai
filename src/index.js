@@ -180,7 +180,7 @@ async function chat(req,env,ctx,cors,user,token){
     console.error("gemini_upstream_error",JSON.stringify({status:gr.status,model,body:detail.slice(0,1200)}));
     const upstreamCode=gr.status===401||gr.status===403?"ai_auth_error":gr.status===404?"ai_model_unavailable":gr.status===429?"ai_rate_limited":"ai_error";
     const upstreamMessage=upstreamCode==="ai_auth_error"?"Gemini rejected the server API key. Check the key and API access.":upstreamCode==="ai_model_unavailable"?"The selected Gemini model is unavailable. Choose a supported model in Admin settings.":upstreamCode==="ai_rate_limited"?"Gemini is rate-limiting requests. Wait briefly and retry.":"The AI service failed. Please retry shortly.";
-    return json({error:upstreamMessage},502,cors);
+    return json({error:upstreamCode},502,cors);
   }
   if(!chatId){
     const {data:c}=await sbJson(env,"/rest/v1/chats",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({user_id:user.id,title:text.slice(0,36)})});
