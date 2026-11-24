@@ -356,7 +356,7 @@ async function apiAction(req,env,user,body,token){
 }
 function injectDiagnostics(html){
   if(html.includes('src="/diagnostics.js"'))return html;
-  return html.replace(/<\/head>/i,'<script src="/diagnostics.js" defer></script></head>');
+  return html.replace(/<\/head>/i,'<script src="/diagnostics.js"></script></head>');
 }
 export default {
  async fetch(req,env,ctx){
