@@ -758,6 +758,16 @@ function closeM(){$('mod').innerHTML=''}
 function diagnosticSafe(value){return String(value??'Unknown error').replace(/Bearer\s+[A-Za-z0-9._~+\/-]+=*/gi,'Bearer [redacted]').replace(/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,'[token redacted]').replace(/(api[_-]?key|apikey|secret|password)(\s*[:=]\s*)[^\s,;]+/gi,'$1$2[redacted]').replace(/[\u0000-\u001f]/g,' ').slice(0,700)}
 let diagnosticItems=[];
 function reportDiagnostic(area,error,extra={}){
+ if(window.__vaaniDiagnostics){
+  window.__vaaniDiagnostics.report({
+   area,stage:extra.stage||'Application operation',status:error?.status||extra.status||'Unknown',
+   code:error?.code||extra.code||'CLIENT_ERROR',
+   message:error?.message||error?.details||error||'Unknown error',
+   requestId:error?.request_id||extra.requestId||'Not supplied by server',
+   endpoint:extra.endpoint||location.pathname,hint:error?.hint||extra.hint||''
+  });
+  return;
+ }
  const message=diagnosticSafe(error?.message||error?.details||error||'Unknown error');
  const code=diagnosticSafe(error?.code||error?.status||extra.code||'CLIENT_ERROR');
  const item={area:diagnosticSafe(area),message,code,time:new Date().toLocaleString(),hint:diagnosticSafe(error?.hint||extra.hint||'')};
@@ -1205,7 +1215,14 @@ async function send(){
    }else if(j.type==='done'){
     completed=true;
     if(Number.isFinite(j.credits_left)){prof.credits=j.credits_left;$('cr').textContent=prof.credits}
-   }else if(j.type==='error')throw new Error(j.error||'AI request failed');
+   }else if(j.type==='error'){
+    const failure=new Error(j.message||j.error||'AI request failed');
+    failure.code=j.code||j.error||'AI_STREAM_ERROR';
+    failure.status=j.status||502;
+    failure.request_id=j.request_id||'Not supplied by server';
+    failure.stage=j.stage||'AI Chat API';
+    throw failure;
+   }
   };
   for(;;){
    const {done,value}=await rd.read();if(done)break;
@@ -1219,7 +1236,7 @@ async function send(){
   if(!b.x)throw new Error('AI returned an empty answer');
   if(cur===chat)draw();
  }catch(e){
-  reportDiagnostic('AI chat request',e,{hint:'Check Worker /api/chat response, Gemini model/key, CORS and Supabase chat/credit writes.'});
+  reportDiagnostic('AI chat request',e,{stage:e?.stage||'AI Chat API',status:e?.status||'Unknown',requestId:e?.request_id||'Not supplied by server',hint:'Check the exact stage and request ID above; use Cloudflare and Supabase logs to inspect server-side failures.'});
   const message=String(e?.message||'AI request failed');
   b.failed=message;
   if(cur===chat)draw();
