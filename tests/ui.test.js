@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { Script } from "node:vm";
 
 describe("Vaani chat UI", () => {
   it("keeps the root compatibility entrypoint byte-for-byte aligned with the deployed public frontend", () => {
@@ -140,6 +141,7 @@ describe("Vaani chat UI", () => {
     const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
     const diagnostics = readFileSync(new URL("../public/diagnostics.js", import.meta.url), "utf8");
     const worker = readFileSync(new URL("../src/index.js", import.meta.url), "utf8");
+    expect(() => new Script(diagnostics)).not.toThrow();
     expect(html).toContain("window.__vaaniDiagnostics");
     expect(html).toContain("requestId:e?.request_id");
     expect(html).toContain("failure.code=j.code");
