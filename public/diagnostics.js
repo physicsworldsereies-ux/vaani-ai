@@ -131,23 +131,18 @@
     }
   }, true);
 
-  if (typeof window.reportDiagnostic !== "function") {
-    window.addEventListener("error", event => {
-      if (event.target && event.target !== window) {
-        const target = event.target;
-        report({area:"Resource loading",stage:"Browser resource",code:"RESOURCE_LOAD_FAILED",
-          message:"A page resource could not be loaded.",endpoint:target.src || target.href || location.pathname});
-      } else {
-        report({area:"Browser JavaScript",stage:"Runtime",code:"JAVASCRIPT_ERROR",
-          message:event.message || "Script error",endpoint:event.filename || location.pathname,
-          hint:event.lineno ? "Line "+event.lineno : ""});
-      }
-    }, true);
-    window.addEventListener("unhandledrejection", event => {
-      report({area:"Unhandled async operation",stage:"Promise",code:"UNHANDLED_REJECTION",
-        message:event.reason?.message || event.reason || "Promise rejected",endpoint:location.pathname});
-    });
-  }
+  window.addEventListener("error", event => {
+    if (event.target && event.target !== window) return;
+    if (typeof window.reportDiagnostic === "function") return;
+    report({area:"Browser JavaScript",stage:"Runtime",code:"JAVASCRIPT_ERROR",
+      message:event.message || "Script error",endpoint:event.filename || location.pathname,
+      hint:event.lineno ? "Line "+event.lineno : ""});
+  }, true);
+  window.addEventListener("unhandledrejection", event => {
+    if (typeof window.reportDiagnostic === "function") return;
+    report({area:"Unhandled async operation",stage:"Promise",code:"UNHANDLED_REJECTION",
+      message:event.reason?.message || event.reason || "Promise rejected",endpoint:location.pathname});
+  });
 
   const nativeFetch = window.fetch.bind(window);
   window.fetch = async (input, init = {}) => {
