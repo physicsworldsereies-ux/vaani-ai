@@ -2,6 +2,7 @@
   if (window.__vaaniDiagnostics) return;
 
   const recent = [];
+  let lastSignature = "", lastReportedAt = 0;
   const clean = value => String(value ?? "Unknown error")
     .replace(/Bearer\s+[A-Za-z0-9._~+\/-]+=*/gi, "Bearer [redacted]")
     .replace(/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, "[token redacted]")
@@ -27,6 +28,10 @@
 
   function report(info = {}) {
     const path = endpoint(info.endpoint || location.pathname);
+    const signature = [info.area,info.stage,info.code,info.message,path].map(x=>String(x||"")).join("|");
+    const now = Date.now();
+    if (signature === lastSignature && now - lastReportedAt < 1200) return;
+    lastSignature = signature; lastReportedAt = now;
     const item = {
       time: new Date().toLocaleString(),
       area: clean(info.area || classify(path)),
