@@ -241,7 +241,7 @@ html.direct-chat *,html.direct-chat *::before,html.direct-chat *::after{animatio
   #app .box .ic{width:34px}
 }
 
-#auth-loader{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#000;visibility:visible;opacity:1}
+#auth-loader{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#000;visibility:visible;opacity:1}#auth-loader .loader-content{display:flex;flex-direction:column;align-items:center;gap:18px;padding:24px;text-align:center}#auth-loader-status{max-width:min(88vw,520px);color:#aaa;font:12px/1.5 system-ui,sans-serif;overflow-wrap:anywhere}
 #auth-loader.hide{display:none!important}
 #auth-loader .loader-dots{display:flex;align-items:center;gap:7px}
 #auth-loader .loader-dots span{width:7px;height:7px;border-radius:50%;background:#fff;opacity:.25;animation:auth-dot 1s ease-in-out infinite}
@@ -695,7 +695,7 @@ input,select,textarea{max-width:100%;min-width:0}
 </style>
 </head>
 <body>
-<div id="auth-loader" role="status" aria-label="Loading chat"><div class="loader-dots" aria-hidden="true"><span></span><span></span><span></span></div></div>
+<div id="auth-loader" role="status" aria-label="Loading chat"><div class="loader-content"><div class="loader-dots" aria-hidden="true"><span></span><span></span><span></span></div><div id="auth-loader-status" aria-live="polite">Starting Vaani…</div></div></div>
 <div class="stars"></div>
 <div class="orb o1"></div><div class="orb o2"></div>
 <div id="land">
@@ -731,7 +731,27 @@ input,select,textarea{max-width:100%;min-width:0}
 
 <div id="mod"></div>
 <script>window.MathJax={startup:{typeset:false},tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]'],['$$','$$']],processEscapes:true},options:{skipHtmlTags:['script','noscript','style','textarea','pre','code']}};</script><script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* Early boot trace: runs before third-party libraries and the main app bundle. */
+(function(){
+ const status=()=>document.getElementById('auth-loader-status');
+ let stage='Loading application scripts',stageAt=Date.now(),completed=false;
+ const stamp=()=>new Date().toLocaleTimeString();
+ window.__vaaniBootTrace={
+  setStage(next){stage=String(next);stageAt=Date.now();const el=status();if(el)el.textContent=stage+' · '+stamp()},
+  fail(error){const el=status();if(el)el.textContent='Startup error: '+String(error?.message||error||'Unknown error')+' · '+stamp()},
+  complete(){completed=true;const el=status();if(el)el.textContent='Ready · '+stamp()}
+ };
+ window.addEventListener('error',event=>{
+  if(!completed&&event.message)window.__vaaniBootTrace.fail(event.message+(event.filename?' ('+event.filename.split('/').pop()+':'+event.lineno+')':''));
+ });
+ window.__vaaniBootTrace.setStage(stage);
+ setTimeout(()=>{
+  if(!completed){const el=status();if(el)el.textContent='Still waiting at: '+stage+' · started '+new Date(stageAt).toLocaleTimeString()+' · elapsed '+Math.round((Date.now()-stageAt)/1000)+'s'}
+ },10000);
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" onload="window.__vaaniBootTrace?.setStage('Supabase library loaded')" onerror="window.__vaaniBootTrace?.fail('Supabase client library failed to load from jsDelivr')"></script>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
 const $=id=>document.getElementById(id);
@@ -747,7 +767,7 @@ let qi=0,dc=50;function loop(){const [q,a]=Q[qi++%Q.length],dq=$('dq'),da=$('da'
 loop();
 // ===== Supabase =====
 const SB_URL='https://voohqnqyspxdlyaqygof.supabase.co',SB_KEY='sb_publishable__GL22Bcvbk0VC-uhhrsQ1Q_9edvV9OD';
-const sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});window.__vaaniBootTrace?.setStage("Supabase client initialized");
 let user=null,prof=null,chats=[],cur=null,busy=false,pendingImages=[];
 renderPacks();
 function modal(h){
@@ -933,6 +953,7 @@ async function enter(session){
    request,
    new Promise((_,reject)=>setTimeout(()=>reject(new Error(label+'_timeout')),7000))
   ]);
+  window.__vaaniBootTrace?.setStage("Loading account profile");
   const profileResult=await withTimeout(
    sb.from('profiles').select('*').eq('id',user.id).maybeSingle(),
    'profile_load'
@@ -947,12 +968,14 @@ async function enter(session){
   $('nm').textContent=nm;$('av').textContent=(nm[0]||'U').toUpperCase();
   if(prof.avatar_url){$('av').textContent='';$('av').style.backgroundImage='url('+JSON.stringify(prof.avatar_url)+')';$('av').style.backgroundSize='cover'}
   $('cr').textContent=prof.credits??0;$('adminBtn').classList.toggle('hide',!prof.is_admin);
+  window.__vaaniBootTrace?.setStage('Loading chat history');
   const r=await withTimeout(
    sb.from('chats').select('id,title').order('updated_at',{ascending:false}),
    'chat_history_load'
   );
   if(r.error)throw Object.assign(new Error(r.error.message||'Chat history query failed'),r.error);
   chats=(r.data||[]).map(c=>({id:c.id,t:c.title,m:null}));
+  window.__vaaniBootTrace?.setStage("Chat history loaded");
  }catch(e){
   reportDiagnostic('Account profile / chat history',e,{stage:'Supabase Database',status:e?.status||(String(e?.message||'').endsWith('_timeout')?'Timeout':'Unknown'),code:e?.code||(String(e?.message||'').endsWith('_timeout')?'REQUEST_TIMEOUT':'SUPABASE_PROFILE_OR_HISTORY_FAILED'),hint:'Check Supabase profiles/chats access, RLS policies, network and the 7-second request timeout.'});
   toast('Account data could not fully load. You can still open your chat; refresh in a moment if needed.');
@@ -995,6 +1018,7 @@ async function showChatForSession(session){
     }
     $('auth-loader').classList.add('hide');
     document.documentElement.classList.remove('auth-pending');
+    window.__vaaniBootTrace?.complete();
     await enterTask;
     while(entering) await new Promise(resolve=>setTimeout(resolve,20));
     if(user){
@@ -1056,17 +1080,25 @@ sb.auth.onAuthStateChange((ev,session)=>{
 /* Resolve the saved session before revealing either homepage or chat. */
 (async function bootAuth(){
   try{
-    const {data:{session}}=await sb.auth.getSession();
+    window.__vaaniBootTrace?.setStage('Restoring saved Supabase session');
+    const sessionResult=await Promise.race([
+      sb.auth.getSession(),
+      new Promise((_,reject)=>setTimeout(()=>reject(Object.assign(new Error('Supabase getSession did not complete within 12 seconds'),{code:'SESSION_RESTORE_TIMEOUT',status:'Timeout'})),12000))
+    ]);
+    const {data:{session}}=sessionResult;
     if(session){
       $('auth-loader').classList.remove('hide');
       await showChatForSession(session);
     }else{
+      window.__vaaniBootTrace?.setStage('No saved session; showing sign-in page');
+      window.__vaaniBootTrace?.complete();
       $('auth-loader').classList.add('hide');
       $('app').classList.add('hide');$('land').classList.remove('hide');
       document.documentElement.classList.remove('auth-pending');
     }
   }catch(e){
-    reportDiagnostic('Session bootstrap',e,{stage:'Supabase Auth',status:e?.status||'Unknown',code:e?.code||'SESSION_BOOTSTRAP_FAILED',hint:'Check Supabase Auth availability and browser session storage.'});
+    window.__vaaniBootTrace?.fail((e?.code||'SESSION_BOOTSTRAP_FAILED')+': '+(e?.message||'Session bootstrap failed'));
+    reportDiagnostic('Session bootstrap',e,{stage:'Supabase Auth',status:e?.status||'Unknown',code:e?.code||'SESSION_BOOTSTRAP_FAILED',hint:'The screen now records the exact startup stage and timestamp. Check Supabase Auth availability, browser session storage and the diagnostic code.'});
     $('auth-loader').classList.add('hide');
     $('app').classList.add('hide');$('land').classList.remove('hide');
     document.documentElement.classList.remove('auth-pending');
