@@ -169,8 +169,8 @@
           stage:payload.stage || "HTTP response",
           status:response.status,
           code:payload.code || payload.error || "HTTP_ERROR",
-          message:payload.message || payload.diagnostic_message || response.statusText || "Request failed",
-          requestId:payload.request_id || response.headers.get("x-request-id"),
+          message:[payload.message,payload.diagnostic_detail,payload.details,payload.hint].filter(Boolean).join(" | ") || response.statusText || "Request failed",
+          requestId:payload.request_id || response.headers.get("x-request-id") || response.headers.get("sb-request-id") || response.headers.get("x-kong-request-id"),
           endpoint:path,
           hint:payload.upstream_status ? "Upstream service HTTP "+payload.upstream_status : ""
         });
