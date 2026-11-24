@@ -3,10 +3,10 @@
 
   const recent = [];
   const clean = value => String(value ?? "Unknown error")
-    .replace(/Bearer\\s+[A-Za-z0-9._~+\\/-]+=*/gi, "Bearer [redacted]")
-    .replace(/eyJ[A-Za-z0-9_-]{20,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}/g, "[token redacted]")
-    .replace(/(api[_-]?key|apikey|secret|password)(\\s*[:=]\\s*)[^\\s,;]+/gi, "$1$2[redacted]")
-    .replace(/[\\u0000-\\u001f]/g, " ")
+    .replace(/Bearer\s+[A-Za-z0-9._~+\/-]+=*/gi, "Bearer [redacted]")
+    .replace(/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, "[token redacted]")
+    .replace(/(api[_-]?key|apikey|secret|password)(\s*[:=]\s*)[^\s,;]+/gi, "$1$2[redacted]")
+    .replace(/[\u0000-\u001f]/g, " ")
     .slice(0, 700);
 
   const endpoint = value => {
@@ -17,11 +17,11 @@
   };
 
   const classify = path => {
-    if (/\\/auth\\/v1\\//.test(path)) return "Supabase Authentication";
-    if (/\\/rest\\/v1\\//.test(path)) return "Supabase Database";
-    if (/\\/api\\/chat/.test(path)) return "AI Chat API";
-    if (/\\/api\\/admin/.test(path)) return "Admin API";
-    if (/\\/api/.test(path)) return "Vaani Backend API";
+    if (/\/auth\/v1\//.test(path)) return "Supabase Authentication";
+    if (/\/rest\/v1\//.test(path)) return "Supabase Database";
+    if (/\/api\/chat/.test(path)) return "AI Chat API";
+    if (/\/api\/admin/.test(path)) return "Admin API";
+    if (/\/api/.test(path)) return "Vaani Backend API";
     return "Website resource";
   };
 
@@ -80,7 +80,7 @@
           x.time, x.area, "Stage: "+x.stage, "HTTP: "+x.status,
           "Code: "+x.code, "Message: "+x.message, "Request ID: "+x.requestId,
           "Endpoint: "+x.endpoint, x.hint
-        ].filter(Boolean).join(" | ")).join("\\n");
+        ].filter(Boolean).join(" | ")).join("\n");
         if (navigator.clipboard?.writeText) navigator.clipboard.writeText(value).then(() => {}).catch(() => {});
       }),
       button("Dismiss", () => { panel.hidden = true; })
@@ -142,7 +142,7 @@
     const started = Date.now();
     let finished = false;
     const timer = setTimeout(() => {
-      if (!finished && (/\\/api(?:\\/|$)|\\/auth\\/v1\\/|\\/rest\\/v1\\//.test(path))) {
+      if (!finished && (/\/api(?:\/|$)|\/auth\/v1\/|\/rest\/v1\//.test(path))) {
         report({area:classify(path),stage:"Network timeout",status:"Timeout",code:"REQUEST_TIMEOUT",
           message:"The server did not return response headers within 20 seconds.",
           endpoint:path,hint:"Check the matching Supabase or Cloudflare logs using the request time."});
