@@ -817,7 +817,7 @@ function formatReply(value){
  return out.join('');
 }
 function typesetMath(){const target=$('col');if(window.MathJax&&MathJax.typesetPromise){MathJax.typesetClear?.([target]);MathJax.typesetPromise([target]).catch(()=>{});}}
-async function loadPacks(){try{const {data,error}=await sb.from('credit_packs').select('id,name,credits,price_paise,is_popular').eq('active',true).order('sort');if(error)throw error;if(data&&data.length){PACKS=data.map(d=>({id:d.id,name:d.name,c:d.credits,p:d.price_paise/100,b:d.is_popular}));renderPacks()}}catch(e){reportDiagnostic('Credit packs',e,{hint:'Check Supabase credit_packs table, SELECT policy and database connectivity.'})}}
+async function loadPacks(){try{const {data,error}=await sb.from('credit_packs').select('id,name,credits,price_paise,is_popular').eq('active',true).order('sort');if(error)throw error;if(data&&data.length){PACKS=data.map(d=>({id:d.id,name:d.name,c:d.credits,p:d.price_paise/100,b:d.is_popular}));renderPacks()}}catch(e){reportDiagnostic('Credit packs',e,{stage:'Supabase Database',status:e?.status||'Unknown',code:e?.code||'CREDIT_PACKS_QUERY_FAILED',hint:'Check Supabase credit_packs table, SELECT policy and database connectivity.'})}}
 loadPacks();
 function authOpen(){modal(`<h2>Welcome to Vaani</h2><p>Sign in to get free credits and save your chats.</p><button class="g" onclick="signIn()"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>Continue with Google</button><p class="small" style="margin:1rem 0 0">By continuing you agree to the Terms and Privacy Policy.</p>`)}
 let signInPending=false;
@@ -832,7 +832,7 @@ async function signIn(){
   const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});
   if(error)throw error;
  }catch(e){
-  reportDiagnostic('Google sign-in',e,{hint:'Check Supabase Google provider settings and the exact OAuth redirect URL.'});
+  reportDiagnostic('Google sign-in',e,{stage:'Supabase Auth',status:e?.status||'Unknown',code:e?.code||'GOOGLE_OAUTH_FAILED',hint:'Check Supabase Google provider settings and the exact OAuth redirect URL.'});
   signInPending=false;
   if(button){button.disabled=false;button.removeAttribute('aria-busy')}
   toast('Login failed: '+(e.message||'Please try again'));
@@ -954,7 +954,7 @@ async function enter(session){
   if(r.error)throw Object.assign(new Error(r.error.message||'Chat history query failed'),r.error);
   chats=(r.data||[]).map(c=>({id:c.id,t:c.title,m:null}));
  }catch(e){
-  reportDiagnostic('Account profile / chat history',e,{hint:'Check Supabase profiles/chats access, RLS policies, network and the 7-second request timeout.'});
+  reportDiagnostic('Account profile / chat history',e,{stage:'Supabase Database',status:e?.status||(String(e?.message||'').endsWith('_timeout')?'Timeout':'Unknown'),code:e?.code||(String(e?.message||'').endsWith('_timeout')?'REQUEST_TIMEOUT':'SUPABASE_PROFILE_OR_HISTORY_FAILED'),hint:'Check Supabase profiles/chats access, RLS policies, network and the 7-second request timeout.'});
   toast('Account data could not fully load. You can still open your chat; refresh in a moment if needed.');
   /* An authenticated user must never be sent back to the marketing homepage because a profile/history request failed. */
   if(session?.user){
@@ -1066,7 +1066,7 @@ sb.auth.onAuthStateChange((ev,session)=>{
       document.documentElement.classList.remove('auth-pending');
     }
   }catch(e){
-    reportDiagnostic('Session bootstrap',e,{hint:'Check Supabase Auth availability and browser session storage.'});
+    reportDiagnostic('Session bootstrap',e,{stage:'Supabase Auth',status:e?.status||'Unknown',code:e?.code||'SESSION_BOOTSTRAP_FAILED',hint:'Check Supabase Auth availability and browser session storage.'});
     $('auth-loader').classList.add('hide');
     $('app').classList.add('hide');$('land').classList.remove('hide');
     document.documentElement.classList.remove('auth-pending');
