@@ -249,7 +249,7 @@ async function chat(req,env,ctx,cors,user,token){
       await sendEvent({type:"done",credits_left:deducted.data,credits_used:cost});
     }catch(e){
       const reason=String(e?.message||e||"unknown_error");
-      console.error("chat_pipeline_error",JSON.stringify({reason:reason.slice(0,300),model}));
+      console.error("chat_pipeline_error",JSON.stringify({request_id:cors["x-request-id"],stage:e?.stage||"Chat pipeline",code:e?.code||reason.slice(0,120),upstream_status:e?.upstreamStatus||null,reason:reason.slice(0,300),model}));
       const publicError=reason==="insufficient_credits"?"no_credits":reason==="empty_reply"?"The AI returned an empty response. Please retry.":reason.startsWith("supabase_")?"Chat saving or credit deduction failed. Please retry shortly.":reason==="chat_not_found"?"This chat could not be found. Start a new chat.":"The AI service failed. Please retry shortly.";
       const diagnosticMessage=e?.diagnosticMessage||(reason==="empty_reply"?"The AI provider returned an empty response.":reason.startsWith("supabase_")?"Supabase failed while saving the chat or updating credits.":reason);
       try{await sendEvent({type:"error",error:publicError,code:e?.code||reason, message:diagnosticMessage,stage:e?.stage||"Chat pipeline",status:e?.upstreamStatus||e?.status||500,request_id:cors["x-request-id"]})}catch{}
