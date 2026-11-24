@@ -56,7 +56,7 @@
         boxShadow: "0 12px 40px #000b",
         font: "13px/1.45 system-ui, sans-serif"
       });
-      document.body.append(panel);
+      (document.body || document.documentElement).append(panel);
     }
     panel.replaceChildren();
     const header = document.createElement("div");
