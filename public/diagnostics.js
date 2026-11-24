@@ -116,6 +116,16 @@
 
   // The app shell already routes JavaScript exceptions through reportDiagnostic.
   // Reuse that handler when present to avoid duplicate error panels.
+  // Capture failed scripts, stylesheets, images and other page resources too.
+  window.addEventListener("error", event => {
+    if (event.target && event.target !== window) {
+      const target = event.target;
+      report({area:"Resource loading",stage:"Browser resource",status:"Unavailable",
+        code:"RESOURCE_LOAD_FAILED",message:"A page resource could not be loaded.",
+        endpoint:target.src || target.href || location.pathname});
+    }
+  }, true);
+
   if (typeof window.reportDiagnostic !== "function") {
     window.addEventListener("error", event => {
       if (event.target && event.target !== window) {
