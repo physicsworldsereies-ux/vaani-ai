@@ -136,4 +136,23 @@ describe("Vaani chat UI", () => {
     expect(worker).toContain("setting_not_allowed");
   });
 
+  it("loads the global diagnostics runtime and reports site-wide errors with HTTP status and request IDs", () => {
+    const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+    const diagnostics = readFileSync(new URL("../public/diagnostics.js", import.meta.url), "utf8");
+    const worker = readFileSync(new URL("../src/index.js", import.meta.url), "utf8");
+    expect(html).toContain("window.__vaaniDiagnostics");
+    expect(html).toContain("requestId:e?.request_id");
+    expect(html).toContain("failure.code=j.code");
+    expect(diagnostics).toContain("window.fetch = async");
+    expect(diagnostics).toContain("REQUEST_TIMEOUT");
+    expect(diagnostics).toContain("NETWORK_ERROR");
+    expect(diagnostics).toContain("HTTP_ERROR");
+    expect(diagnostics).toContain("Request ID:");
+    expect(diagnostics).toContain("Copy details");
+    expect(worker).toContain("function injectDiagnostics(html)");
+    expect(worker).toContain('src="/diagnostics.js"');
+    expect(worker).toContain('"x-request-id":requestId');
+    expect(worker).toContain("diagnosticMessage");
+  });
+
 });
