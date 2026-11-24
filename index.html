@@ -752,7 +752,7 @@ input,select,textarea{max-width:100%;min-width:0}
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" onload="window.__vaaniBootTrace?.setStage('Supabase library loaded')" onerror="window.__vaaniBootTrace?.fail('Supabase client library failed to load from jsDelivr')"></script>
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<!-- Razorpay Checkout is loaded on demand, never during application startup. -->
 <script>
 const $=id=>document.getElementById(id);
 let PACKS=[{id:1,c:100,p:99},{id:2,c:500,p:399,b:1},{id:3,c:1500,p:999},{id:4,c:5000,p:2999,b:0}];
@@ -1128,8 +1128,24 @@ async function out(){
   toast('Sign out failed: '+(e.message||'Please try again'));
  }
 }
+let razorpayLoaderPromise=null;
+function loadRazorpay(){
+ if(window.Razorpay)return Promise.resolve(window.Razorpay);
+ if(!razorpayLoaderPromise){
+  razorpayLoaderPromise=new Promise((resolve,reject)=>{
+   const script=document.createElement('script');
+   script.src='https://checkout.razorpay.com/v1/checkout.js';
+   script.async=true;
+   const timeout=setTimeout(()=>{script.remove();razorpayLoaderPromise=null;reject(new Error('Razorpay Checkout loading timed out. Check your network and try again.'))},12000);
+   script.onload=()=>{clearTimeout(timeout);if(window.Razorpay)resolve(window.Razorpay);else{razorpayLoaderPromise=null;reject(new Error('Razorpay script loaded but Checkout is unavailable.'))}};
+   script.onerror=()=>{clearTimeout(timeout);razorpayLoaderPromise=null;reject(new Error('Could not load Razorpay Checkout. Check your network and try again.'))};
+   document.head.appendChild(script);
+  });
+ }
+ return razorpayLoaderPromise;
+}
 function buyOpen(){if(!user){authOpen();return}modal(`<h2>Top up credits</h2><p>Secure checkout via Razorpay. Credits are added only after server-side signature verification.</p>`+PACKS.map(k=>`<div class="row"><span><b>${k.c}</b> credits</span><button class="btn ${k.b?'pri':'ghost'}" style="padding:.4rem .9rem" onclick="buy(${Number(k.id)})">₹${Number(k.p).toFixed(2)}</button></div>`).join('')+`<button class="btn ghost" style="width:100%;margin-top:1rem" onclick="closeM()">Close</button>`)}
-async function buy(packId){try{if(!window.Razorpay)throw new Error('Razorpay Checkout failed to load.');const order=await api('create-order',{pack_id:packId});closeM();const checkout=new Razorpay({key:order.key_id,amount:order.amount,currency:order.currency,name:order.name,description:order.description,order_id:order.order_id,prefill:order.prefill,theme:{color:'#ffb547'},handler:async function(response){try{const result=await api('verify-payment',response);if(result.credits!==null&&result.credits!==undefined&&Number.isFinite(Number(result.credits))){prof=prof||{};prof.credits=Number(result.credits);$('cr').textContent=String(prof.credits);const pc=$('profileCredits');if(pc)pc.textContent=String(prof.credits);toast('Payment verified. Credits updated.')}else{await refreshCredits(false);toast('Payment verified. Balance refreshed.')}}catch(e){await refreshCredits(false);toast('Payment submitted. If credits are not visible yet, use Refresh balance. '+e.message)}} ,modal:{ondismiss:function(){void refreshCredits(false);toast('Checkout closed. If payment succeeded, your balance will refresh after server verification.')}}});checkout.open()}catch(e){toast(e.message||'Could not start payment')}}
+async function buy(packId){try{await loadRazorpay();if(!window.Razorpay)throw new Error('Razorpay Checkout is unavailable.');const order=await api('create-order',{pack_id:packId});closeM();const checkout=new Razorpay({key:order.key_id,amount:order.amount,currency:order.currency,name:order.name,description:order.description,order_id:order.order_id,prefill:order.prefill,theme:{color:'#ffb547'},handler:async function(response){try{const result=await api('verify-payment',response);if(result.credits!==null&&result.credits!==undefined&&Number.isFinite(Number(result.credits))){prof=prof||{};prof.credits=Number(result.credits);$('cr').textContent=String(prof.credits);const pc=$('profileCredits');if(pc)pc.textContent=String(prof.credits);toast('Payment verified. Credits updated.')}else{await refreshCredits(false);toast('Payment verified. Balance refreshed.')}}catch(e){await refreshCredits(false);toast('Payment submitted. If credits are not visible yet, use Refresh balance. '+e.message)}} ,modal:{ondismiss:function(){void refreshCredits(false);toast('Checkout closed. If payment succeeded, your balance will refresh after server verification.')}}});checkout.open()}catch(e){toast(e.message||'Could not start payment')}}
 async function refreshCredits(showToast=true){
  if(!user){if(showToast)toast('Please sign in to refresh credits.');return false}
  const btn=$('refreshCreditsBtn');
