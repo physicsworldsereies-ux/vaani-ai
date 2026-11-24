@@ -1165,7 +1165,7 @@ async function refreshCredits(showToast=true){
 function profOpen(){
  const side=$('side');
  if(side.classList.contains('profile-open')){profileClose();return}
- const adminEntry=prof&&prof.is_admin===true&&!prof.is_banned?'<button class="btn pri" style="width:100%;margin:.8rem 0" onclick="location.assign('/admin')">♛ Admin dashboard ↗</button>':'';
+ const adminEntry=prof&&prof.is_admin===true&&!prof.is_banned?"<button class=\"btn pri\" style=\"width:100%;margin:.8rem 0\" onclick=\"location.assign('/admin')\">♛ Admin dashboard ↗</button>":'';
  $('profilePanel').innerHTML=`<div class="profile-head"><h2>Your profile</h2><button class="ic" aria-label="Close profile" onclick="profileClose()">×</button></div><div class="row"><span>Name</span><b>${esc(prof?.full_name||user?.email?.split('@')[0]||'-')}</b></div><div class="row"><span>Email</span><b>${esc(user?.email||'-')}</b></div><div class="row"><span>Credits</span><b id="profileCredits">${prof?.credits??0}</b></div><div class="row"><span>Chats</span><b>${chats.length}</b></div>${adminEntry}<div class="profile-actions"><button class="btn ghost" onclick="profileClose()">Back to chats</button><button class="btn ghost" onclick="out()">Sign out</button></div>`;
  side.classList.add('profile-open');
 }
