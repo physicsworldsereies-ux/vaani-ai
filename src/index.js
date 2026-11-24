@@ -197,10 +197,13 @@ async function chat(req,env,ctx,cors,user,token){
   const gr=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":streamGenerateContent?alt=sse",{method:"POST",headers:{"content-type":"application/json","x-goog-api-key":env.GEMINI_API_KEY},body:JSON.stringify({systemInstruction:{parts:[{text:String(S.system_prompt??"")} ]},contents,generationConfig:{maxOutputTokens:maxOut}})});
   if(!gr.ok||!gr.body){
     const detail=await gr.text().catch(()=>"");
-    console.error("gemini_upstream_error",JSON.stringify({status:gr.status,model,body:detail.slice(0,1200)}));
-    const upstreamCode=gr.status===401||gr.status===403?"ai_auth_error":gr.status===404?"ai_model_unavailable":gr.status===429?"ai_rate_limited":"ai_error";
-    const upstreamMessage=upstreamCode==="ai_auth_error"?"Gemini rejected the server API key. Check the key and API access.":upstreamCode==="ai_model_unavailable"?"The selected Gemini model is unavailable. Choose a supported model in Admin settings.":upstreamCode==="ai_rate_limited"?"Gemini is rate-limiting requests. Wait briefly and retry.":"The AI service failed. Please retry shortly.";
-    return json({error:upstreamCode,code:upstreamCode,message:upstreamMessage,stage:"Gemini API",upstream_status:gr.status},502,cors);
+    let providerMessage="";
+    try{providerMessage=JSON.parse(detail)?.error?.message||""}catch{}
+    providerMessage=String(providerMessage).replace(/(?:key|token|secret)[=: ]+[^\s,;]+/gi,"[credential redacted]").replace(/Bearer\s+[^\s]+/gi,"Bearer [redacted]").slice(0,500);
+    console.error("gemini_upstream_error",JSON.stringify({request_id:cors["x-request-id"],status:gr.status,model,body:detail.slice(0,1200)}));
+    const upstreamCode=gr.status===401||gr.status===403?"ai_auth_error":gr.status===404?"ai_model_unavailable":gr.status===429?"ai_rate_limited":gr.status===400?"ai_invalid_request":"ai_error";
+    const upstreamMessage=upstreamCode==="ai_auth_error"?"Gemini rejected the server API key. Check the key and API access.":upstreamCode==="ai_model_unavailable"?"The selected Gemini model is unavailable. Choose a supported model in Admin settings.":upstreamCode==="ai_rate_limited"?"Gemini is rate-limiting requests. Wait briefly and retry.":upstreamCode==="ai_invalid_request"?(providerMessage||"Gemini rejected the request. Check the selected model and request settings."):"The AI service failed. Please retry shortly.";
+    return json({error:upstreamCode,code:upstreamCode,message:upstreamMessage,diagnostic_detail:providerMessage,stage:"Gemini API",upstream_status:gr.status},502,cors);
   }
   if(!chatId){
     const {data:c}=await sbJson(env,"/rest/v1/chats",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({user_id:user.id,title:text.slice(0,36)})});
@@ -405,7 +408,7 @@ export default {
     if(path==="/api/order"){const b=JSON.parse(await readBody(req));return json(await makeOrder(env,user,b.pack_id),200,cors)}
     if(path==="/api/verify"){const b=JSON.parse(await readBody(req));return json(await verifyPayment(env,user,b),200,cors)}
     const b=JSON.parse(await readBody(req));return json(await apiAction(req,env,user,b,(req.headers.get("authorization")||"").split(" ").slice(1).join(" ")),200,cors);
-   }catch(e){return json({error:e.status===401?"unauthorized":e.message||"server_error",code:e.code||e.message||"server_error",message:e.diagnosticMessage||e.message||"The backend request failed.",stage:e.stage||"Cloudflare Worker",upstream_status:e.upstreamStatus},e.status||500,cors)}
+   }catch(e){console.error("api_request_error",JSON.stringify({request_id:requestId,stage:e?.stage||"Cloudflare Worker",code:e?.code||e?.message||"server_error",upstream_status:e?.upstreamStatus||null}));return json({error:e.status===401?"unauthorized":e.message||"server_error",code:e.code||e.message||"server_error",message:e.diagnosticMessage||e.message||"The backend request failed.",stage:e.stage||"Cloudflare Worker",upstream_status:e.upstreamStatus},e.status||500,cors)}
   }
   if(path.startsWith("/api/"))return json({error:"not_found"},404,cors);
   if(req.method!=="GET"&&req.method!=="HEAD")return json({error:"method_not_allowed"},405,cors);
