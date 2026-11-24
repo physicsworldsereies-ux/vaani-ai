@@ -4,9 +4,19 @@ const RATE_MAX = 12;
 const rateBuckets = new Map();
 let rateSweepCounter = 0;
 
-const json = (data, status=200, headers={}) => new Response(JSON.stringify(data), {
-  status, headers: { "content-type":"application/json; charset=utf-8", "cache-control":"no-store", ...headers }
-});
+const json = (data, status=200, headers={}) => {
+  const requestId=headers["x-request-id"]||headers["X-Request-Id"]||null;
+  const payload=data&&typeof data==="object"&&data.error?{
+    ...data,
+    code:data.code||String(data.error),
+    message:data.message||String(data.error).replaceAll("_"," "),
+    status:data.status??status,
+    ...(requestId?{request_id:requestId}:{})
+  }:data;
+  return new Response(JSON.stringify(payload), {
+    status, headers: { "content-type":"application/json; charset=utf-8", "cache-control":"no-store", ...headers }
+  });
+};
 const enc = new TextEncoder();
 const sb = (env, path, init={}) => fetch(env.SUPABASE_URL + path, {
   ...init,
@@ -21,7 +31,16 @@ async function sbJson(env,path,init={}) {
   const res=await sb(env,path,init);
   const text=await res.text();
   let data=null; try { data=text ? JSON.parse(text) : null; } catch {}
-  if(!res.ok) throw new Error("supabase_"+res.status);
+  if(!res.ok) {
+    const diagnostic=[data?.message,data?.details,data?.hint].filter(Boolean).join(" | ");
+    throw Object.assign(new Error("supabase_"+res.status),{
+      status:502,
+      code:data?.code||"SUPABASE_HTTP_"+res.status,
+      diagnosticMessage:diagnostic||("Supabase REST request failed with HTTP "+res.status),
+      stage:"Supabase Database",
+      upstreamStatus:res.status
+    });
+  }
   return {data,res};
 }
 export function constantEqual(a,b){
@@ -49,7 +68,8 @@ function corsFor(req,env){
     "access-control-allow-methods":"GET,POST,PUT,OPTIONS",
     "access-control-allow-headers":"authorization,content-type",
     "access-control-max-age":"86400",
-    "vary":"Origin"
+    "vary":"Origin",
+    "access-control-expose-headers":"x-request-id"
   };
 }
 function limited(key){
@@ -69,11 +89,11 @@ function limited(key){
 }
 async function authUser(req,env){
   const token=(req.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
-  if(!token) throw Object.assign(new Error("unauthorized"),{status:401});
+  if(!token) throw Object.assign(new Error("unauthorized"),{status:401,code:"AUTH_TOKEN_MISSING",stage:"Supabase Auth",diagnosticMessage:"No access token was sent with the request."});
   const res=await fetch(env.SUPABASE_URL+"/auth/v1/user",{
     headers:{apikey:env.SUPABASE_SERVICE_KEY,authorization:"Bearer "+token}
   });
-  if(!res.ok) throw Object.assign(new Error("unauthorized"),{status:401});
+  if(!res.ok) throw Object.assign(new Error("unauthorized"),{status:401,code:"SUPABASE_AUTH_"+res.status,stage:"Supabase Auth",upstreamStatus:res.status,diagnosticMessage:"Supabase Auth rejected the supplied session (HTTP "+res.status+")."});
   return {user:await res.json(),token};
 }
 async function profile(env,id){
@@ -177,10 +197,13 @@ async function chat(req,env,ctx,cors,user,token){
   const gr=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":streamGenerateContent?alt=sse",{method:"POST",headers:{"content-type":"application/json","x-goog-api-key":env.GEMINI_API_KEY},body:JSON.stringify({systemInstruction:{parts:[{text:String(S.system_prompt??"")} ]},contents,generationConfig:{maxOutputTokens:maxOut}})});
   if(!gr.ok||!gr.body){
     const detail=await gr.text().catch(()=>"");
-    console.error("gemini_upstream_error",JSON.stringify({status:gr.status,model,body:detail.slice(0,1200)}));
-    const upstreamCode=gr.status===401||gr.status===403?"ai_auth_error":gr.status===404?"ai_model_unavailable":gr.status===429?"ai_rate_limited":"ai_error";
-    const upstreamMessage=upstreamCode==="ai_auth_error"?"Gemini rejected the server API key. Check the key and API access.":upstreamCode==="ai_model_unavailable"?"The selected Gemini model is unavailable. Choose a supported model in Admin settings.":upstreamCode==="ai_rate_limited"?"Gemini is rate-limiting requests. Wait briefly and retry.":"The AI service failed. Please retry shortly.";
-    return json({error:upstreamCode},502,cors);
+    let providerMessage="";
+    try{providerMessage=JSON.parse(detail)?.error?.message||""}catch{}
+    providerMessage=String(providerMessage).replace(/(?:key|token|secret)[=: ]+[^\s,;]+/gi,"[credential redacted]").replace(/Bearer\s+[^\s]+/gi,"Bearer [redacted]").slice(0,500);
+    console.error("gemini_upstream_error",JSON.stringify({request_id:cors["x-request-id"],status:gr.status,model,body:detail.slice(0,1200)}));
+    const upstreamCode=gr.status===401||gr.status===403?"ai_auth_error":gr.status===404?"ai_model_unavailable":gr.status===429?"ai_rate_limited":gr.status===400?"ai_invalid_request":"ai_error";
+    const upstreamMessage=upstreamCode==="ai_auth_error"?"Gemini rejected the server API key. Check the key and API access.":upstreamCode==="ai_model_unavailable"?"The selected Gemini model is unavailable. Choose a supported model in Admin settings.":upstreamCode==="ai_rate_limited"?"Gemini is rate-limiting requests. Wait briefly and retry.":upstreamCode==="ai_invalid_request"?(providerMessage||"Gemini rejected the request. Check the selected model and request settings."):"The AI service failed. Please retry shortly.";
+    return json({error:upstreamCode,code:upstreamCode,message:upstreamMessage,diagnostic_detail:providerMessage,stage:"Gemini API",upstream_status:gr.status},502,cors);
   }
   if(!chatId){
     const {data:c}=await sbJson(env,"/rest/v1/chats",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({user_id:user.id,title:text.slice(0,36)})});
@@ -226,9 +249,10 @@ async function chat(req,env,ctx,cors,user,token){
       await sendEvent({type:"done",credits_left:deducted.data,credits_used:cost});
     }catch(e){
       const reason=String(e?.message||e||"unknown_error");
-      console.error("chat_pipeline_error",JSON.stringify({reason:reason.slice(0,300),model}));
+      console.error("chat_pipeline_error",JSON.stringify({request_id:cors["x-request-id"],stage:e?.stage||"Chat pipeline",code:e?.code||reason.slice(0,120),upstream_status:e?.upstreamStatus||null,reason:reason.slice(0,300),model}));
       const publicError=reason==="insufficient_credits"?"no_credits":reason==="empty_reply"?"The AI returned an empty response. Please retry.":reason.startsWith("supabase_")?"Chat saving or credit deduction failed. Please retry shortly.":reason==="chat_not_found"?"This chat could not be found. Start a new chat.":"The AI service failed. Please retry shortly.";
-      try{await sendEvent({type:"error",error:publicError})}catch{}
+      const diagnosticMessage=e?.diagnosticMessage||(reason==="empty_reply"?"The AI provider returned an empty response.":reason.startsWith("supabase_")?"Supabase failed while saving the chat or updating credits.":reason);
+      try{await sendEvent({type:"error",error:publicError,code:e?.code||reason, message:diagnosticMessage,stage:e?.stage||"Chat pipeline",status:e?.upstreamStatus||e?.status||500,request_id:cors["x-request-id"]})}catch{}
     }
     finally{try{await writer.close()}catch{}}
   })());
@@ -330,15 +354,20 @@ async function apiAction(req,env,user,body,token){
   if(action==="chat")throw Object.assign(new Error("use_chat_endpoint"),{status:400});
   throw Object.assign(new Error("unknown_action"),{status:400});
 }
+function injectDiagnostics(html){
+  if(html.includes('src="/diagnostics.js"'))return html;
+  return html.replace(/<\/head>/i,'<script src="/diagnostics.js"></script></head>');
+}
 export default {
  async fetch(req,env,ctx){
-  const cors=corsFor(req,env),url=new URL(req.url),path=url.pathname;
+  const requestId=crypto.randomUUID();
+  const cors={...corsFor(req,env),"x-request-id":requestId},url=new URL(req.url),path=url.pathname;
   if(path==="/health")return json({ok:true,service:"vaani-ai",time:new Date().toISOString()},200,cors);
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
   if(path==="/api/razorpay-webhook"&&req.method==="POST")return handleWebhook(req,env);
   if(path==="/api/chat"&&req.method==="POST"){
    try{const {user,token}=await authUser(req,env);return await chat(req,env,ctx,cors,user,token)}
-   catch(e){console.error("chat_request_error",String(e?.message||e||"unknown_error").slice(0,300));return json({error:e.status===401?"unauthorized":e.status===413?"body_too_large":"server_error"},e.status||500,cors)}
+   catch(e){console.error("chat_request_error",JSON.stringify({request_id:requestId,stage:e?.stage||"Cloudflare Worker",code:e?.code||e?.message||"server_error",upstream_status:e?.upstreamStatus||null}));return json({error:e.status===401?"unauthorized":e.status===413?"body_too_large":"server_error",code:e?.code||e?.message||"server_error",message:e?.diagnosticMessage||e?.message||"The chat request failed in the Cloudflare Worker.",stage:e?.stage||"Cloudflare Worker",upstream_status:e?.upstreamStatus},e.status||500,cors)}
   }
   if(path==="/api/order"&&req.method==="POST"||path==="/api/verify"&&req.method==="POST"||path==="/api"&&req.method==="POST"||path.startsWith("/api/admin/")){
    try{
@@ -379,7 +408,7 @@ export default {
     if(path==="/api/order"){const b=JSON.parse(await readBody(req));return json(await makeOrder(env,user,b.pack_id),200,cors)}
     if(path==="/api/verify"){const b=JSON.parse(await readBody(req));return json(await verifyPayment(env,user,b),200,cors)}
     const b=JSON.parse(await readBody(req));return json(await apiAction(req,env,user,b,(req.headers.get("authorization")||"").split(" ").slice(1).join(" ")),200,cors);
-   }catch(e){return json({error:e.status===401?"unauthorized":e.message||"server_error"},e.status||500,cors)}
+   }catch(e){console.error("api_request_error",JSON.stringify({request_id:requestId,stage:e?.stage||"Cloudflare Worker",code:e?.code||e?.message||"server_error",upstream_status:e?.upstreamStatus||null}));return json({error:e.status===401?"unauthorized":e.message||"server_error",code:e.code||e.message||"server_error",message:e.diagnosticMessage||e.message||"The backend request failed.",stage:e.stage||"Cloudflare Worker",upstream_status:e.upstreamStatus},e.status||500,cors)}
   }
   if(path.startsWith("/api/"))return json({error:"not_found"},404,cors);
   if(req.method!=="GET"&&req.method!=="HEAD")return json({error:"method_not_allowed"},405,cors);
@@ -388,7 +417,7 @@ export default {
     const assetUrl=new URL("/",req.url);
     const assetResponse=await env.ASSETS.fetch(new Request(assetUrl.toString(),req));
     if(!assetResponse.ok)return assetResponse;
-    const html=await assetResponse.text();
+    const html=injectDiagnostics(await assetResponse.text());
     const bootstrap=`<script>
       window.addEventListener("load",async function(){
         try{
@@ -418,7 +447,8 @@ export default {
     headers.set("expires","0");
     headers.delete("content-length");
     headers.delete("content-encoding");
-    return new Response(assetResponse.body,{status:assetResponse.status,statusText:assetResponse.statusText,headers});
+    const html=injectDiagnostics(await assetResponse.text());
+    return new Response(html,{status:assetResponse.status,statusText:assetResponse.statusText,headers});
   }
   return assetResponse;
  }
